@@ -53,7 +53,7 @@ The build scripts download these; they are not part of this repository and stay 
 ## Documentation site tooling
 
 The site is built with [MkDocs](https://www.mkdocs.org) (BSD-2-Clause),
-[Material for MkDocs](https://squidfunnel.github.io/mkdocs-material/) (MIT),
+[Material for MkDocs](https://squidfunk.github.io/mkdocs-material/) (MIT),
 [PyMdown Extensions](https://facelessuser.github.io/pymdown-extensions/) (MIT) and
 [mkdocs-minify-plugin](https://github.com/byrnereese/mkdocs-minify-plugin) (MIT). They are installed
 at build time from `requirements-docs.txt`; the generated site contains the theme's own CSS, JavaScript

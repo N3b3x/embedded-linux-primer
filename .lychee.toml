@@ -1,0 +1,9 @@
+# lychee configuration used by .github/workflows/ci-docs-linkcheck.yml
+exclude = [
+  # this repository's own release downloads and Pages site: they exist only after the first release / deploy
+  '^https://github\.com/N3b3x/embedded-linux-primer/releases/',
+  '^https://n3b3x\.github\.io/embedded-linux-primer',
+  # vendor sites that answer automated requests with 403/404
+  '^https://www\.nxp\.com/',
+  '^https://developer\.arm\.com/',
+]

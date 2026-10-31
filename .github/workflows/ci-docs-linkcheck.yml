@@ -1,5 +1,5 @@
-# External link check through the shared workflow in N3b3x/hf-general-ci-tools. Relative links are
-# checked by tools/check-links.py in ci.yml; this one reports dead external links without failing the run.
+# External link check through the shared workflow in N3b3x/hf-general-ci-tools. Relative links, and the
+# site-relative links in site/, are checked by tools/check-links.py and the strict site build in ci.yml.
 name: Docs Link Check CI
 
 on:
@@ -22,11 +22,12 @@ jobs:
     name: Documentation Link Check
     uses: N3b3x/hf-general-ci-tools/.github/workflows/ru-docs-linkcheck.yml@main
     with:
-      paths: 'docs/** boards/** site/** *.md'
-      fail_on_errors: false
+      paths: 'docs/** boards/** *.md'
+      fail_on_errors: true
       timeout: '30'
       max_retries: '3'
       retry_wait_time: '2'
       exclude_private: true
       exclude_mail: true
       verbose: true
+      config_file: '.lychee.toml'
