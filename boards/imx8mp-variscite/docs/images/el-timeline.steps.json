@@ -1,0 +1,57 @@
+{
+  "title": "The boot CPU's exception level over time",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "Boot only ever goes down; runtime pops up and returns",
+      "body": "The vertical axis is the exception level (EL3 at the top) and the horizontal axis is time. Read left to right: the first CPU starts at the top and steps down as each boot stage hands over to the next.\n\nAfter boot, the line spikes up for a moment on a system call, an interrupt or an `smc`, then `eret` brings it back."
+    },
+    {
+      "anchor": "Boot ROM",
+      "up": 1,
+      "title": "Power-on starts at EL3 in silicon",
+      "body": "The Boot ROM is code fixed inside the chip. It runs at the most privileged level and loads the next stage, so nothing can run beneath it."
+    },
+    {
+      "anchor": [
+        "SPL",
+        "BL31"
+      ],
+      "up": 1,
+      "title": "SPL and BL31 still run at EL3",
+      "body": "SPL (U-Boot's small first stage) trains the DDR memory, which does not work at power-on. BL31 then sets up EL3: its vectors, the PSCI handler and the world-switch machinery.\n\nIf this stage fails the board prints nothing at all."
+    },
+    {
+      "anchor": "U-Boot",
+      "up": 1,
+      "title": "BL31 hands down to U-Boot at EL2",
+      "body": "The first `eret` takes the CPU from EL3 to EL2, where U-Boot loads the kernel. Dropping privilege here means the bootloader can no longer touch the secure monitor's state."
+    },
+    {
+      "anchor": "Linux",
+      "title": "Linux starts at EL2 in head.S and drops to EL1",
+      "body": "The kernel's early assembly (`head.S`) begins at EL2, parks the small KVM stub there, and continues at EL1. From then on the kernel probes drivers at EL1, and the line stays low except for brief excursions.",
+      "pad": 30
+    },
+    {
+      "anchor": "/sbin/init → login → your app",
+      "up": 1,
+      "title": "Your application runs at EL0",
+      "body": "init, login and your program run at the lowest level, and every application instruction executes there. They reach the kernel only through `svc`, so a bug in an app cannot touch hardware directly."
+    },
+    {
+      "anchor": [
+        "smc PSCI CPU_ON ×3",
+        "svc: read()",
+        "IRQ: timer"
+      ],
+      "title": "At runtime the CPU pops up and comes back",
+      "body": "An `smc` takes the CPU to EL3 for a moment (here `PSCI CPU_ON` for cores 1-3); an `svc` such as `read()` or an interrupt such as the timer takes it to EL1. Each ends with `eret` back to the caller's level.\n\nThe legend at the bottom of the chart tells the markers apart."
+    },
+    {
+      "anchor": "smc SYSTEM_RESET → chip resets → Boot ROM",
+      "title": "A reboot loops the whole chart",
+      "body": "`svc: reboot` goes from EL0 to the kernel, which calls BL31 with `smc SYSTEM_RESET`. EL3 is the only level able to reset the chip, so the line ends at the Boot ROM again.\n\nReal numbers: CPUs 1-3 started at 0.005 s and `/sbin/init` at 3.44 s. After boot, BL31 is entered only through `smc` or a secure interrupt."
+    }
+  ]
+}

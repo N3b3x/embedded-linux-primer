@@ -1,0 +1,49 @@
+/* "Latest builds" on the downloads page. Built on the variables and the .dv-card / .dv-chip / .dv-btn /
+   .dv-tag styles of diagrams.css (load order: diagrams.css first). Behaviour: javascripts/downloads.js. */
+
+.dl-root { margin: 1.2rem 0 2rem; }
+.dl-status { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin: 0 0 0.9rem; font-size: 0.78rem; color: var(--md-default-fg-color--light, #cbd5e1); }
+.dl-status a { color: var(--dv-accent); }
+.dl-board { margin: 1.6rem 0 0; }
+.dl-board > h3 { display: flex; align-items: baseline; gap: 0.6rem; margin: 0 0 0.7rem; font-size: 1rem; }
+.dl-board > h3 small { font-size: 0.72rem; font-weight: 500; color: var(--dv-muted); }
+.dl-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+
+/* a download card is not a link as a whole: its buttons are */
+.dl-card.dv-card { cursor: default; }
+.dl-card.dv-card:hover { transform: none; box-shadow: 0 8px 26px rgba(0, 0, 0, 0.28); }
+.dl-card .body { gap: 0.55rem; }
+.dl-card h4 { margin: 0; font-size: 0.9rem; line-height: 1.3; font-weight: 700; }
+.dl-card .dl-sub { margin: 0; font-size: 0.72rem; color: var(--dv-muted); }
+.dl-kv { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.7rem; margin: 0; font-size: 0.72rem; }
+.dl-kv dt { color: var(--dv-muted); font-weight: 600; }
+.dl-kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.dl-hash { display: flex; align-items: center; gap: 0.4rem; }
+.dl-hash code { font: 0.68rem ui-monospace, SFMono-Regular, Menlo, monospace; background: transparent; padding: 0; }
+.dl-hash .dv-btn { height: 24px; min-width: 24px; padding: 0 0.45rem; font-size: 0.64rem; }
+.dl-actions { margin-top: auto; display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; padding-top: 0.2rem; }
+.dl-actions a.dv-btn { text-decoration: none; height: 34px; }
+.dl-actions a.dv-btn.primary { color: #04201c; }
+
+.dl-chip-ok { border-color: var(--dv-accent-strong); color: var(--dv-accent); background: rgba(20, 184, 166, 0.12); }
+.dl-chip-pre { border-color: #d97706; color: #fbbf24; }
+.dl-warn {
+  margin: 0; padding: 0.5rem 0.65rem; border-radius: 10px; font-size: 0.72rem; line-height: 1.45;
+  border: 1px solid #d97706; background: rgba(217, 119, 6, 0.14); color: var(--md-default-fg-color, #e5edf7);
+}
+.dl-warn strong { color: inherit; }
+
+.dl-releases { margin-top: 2.2rem; }
+.dl-releases ul { list-style: none; margin: 0.4rem 0 0; padding: 0; border: 1px solid var(--dv-line); border-radius: 12px; overflow: hidden; }
+.dl-releases li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; padding: 0.55rem 0.9rem; border-top: 1px solid var(--dv-line); font-size: 0.78rem; }
+.dl-releases li:first-child { border-top: 0; }
+.dl-releases li a.tag { font-weight: 700; }
+.dl-releases li .when { color: var(--dv-muted); font-size: 0.72rem; margin-left: auto; }
+.dl-note { font-size: 0.74rem; color: var(--dv-muted); margin-top: 0.8rem; }
+.dl-empty { padding: 1.6rem 1.2rem; border: 1px dashed var(--dv-line); border-radius: 14px; font-size: 0.82rem; }
+.dl-empty p { margin: 0 0 0.5rem; }
+
+.dl-stream { margin: 2rem 0 0; }
+.dl-stream > h2 { display: flex; align-items: center; flex-wrap: wrap; gap: 0.7rem; margin: 0 0 0.6rem; font-size: 1.15rem; }
+.dl-stream > p { margin: 0 0 0.8rem; }
+.dl-stream-preview { padding: 0.2rem 1rem 1rem; border: 1px dashed #d97706; border-radius: 14px; }

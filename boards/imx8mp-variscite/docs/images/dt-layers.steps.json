@@ -1,0 +1,21 @@
+{
+  "title": "How the device tree is built in layers",
+  "steps": [
+    {"anchor": null, "title": "Four layers merge into one board file",
+     "body": "A device tree is a text description of the hardware, and this board's is split into layers. Each layer describes only what it adds; later layers switch nodes on or change them through `&labels`.\n\nRead the four columns left to right, then the result and the 47-file explanation below."},
+    {"anchor": "imx8mp.dtsi", "up": 1, "title": "Layer 1: the chip, with most things switched off",
+     "body": "`imx8mp.dtsi` comes from NXP and is 2403 lines. It describes every block inside the i.MX 8M Plus: CPUs, GIC, clocks, I2C, uSDHC, Ethernet, GPU and VPU.\n\nMost nodes are `status = \"disabled\"` (65 of them), because the chip alone cannot know which are wired to anything."},
+    {"anchor": "imx8mp-var-som.dtsi", "up": 1, "title": "Layer 2: what is soldered on the module",
+     "body": "Variscite's 567-line `imx8mp-var-som.dtsi` adds the PMIC, eMMC, Ethernet PHY, Wi-Fi and the pin muxing for the module's own parts.\n\nFor example it sets `&usdhc3` to an 8-bit bus with `status = \"okay\"`: that is the eMMC."},
+    {"anchor": "imx8mp-var-som-symphony.dts", "up": 1, "title": "Layer 3: what the carrier board wires up",
+     "body": "The carrier layer, 685 lines, enables the SD slot, GPIO expanders, RTC, touch, LVDS panel, CAN and audio. It turns on `&i2c4` and adds an `rtc@68` node with compatible `dallas,ds1337`.\n\nThis is the only layer you write for your own carrier board."},
+    {"anchor": "imx8mp-var-som-1.x.dtso", "up": 1, "title": "Layer 4: an overlay for revision 1.x",
+     "body": "A 29-line overlay (`.dtso`) captures the differences of SoM revision 1.x, such as an older Wi-Fi/Bluetooth chip. It disables `&bluetooth_iw61x` and reconfigures `&usdhc1`.\n\nIt is applied after the others, not merged in the source."},
+    {"anchor": "= one compiled board file", "up": 1, "title": "The Makefile merges them into one .dtb",
+     "body": "`dtc` merges layers 1 to 3 into the base `.dtb`, then `fdtoverlay` applies layer 4. The result, `imx8mp-var-som-1.x-symphony.dtb`, is what the kernel sees.\n\nThe merge rule lives in the `Makefile` in `arch/arm64/boot/dts/freescale/`."},
+    {"anchor": "WHY 47 DTB FILES?", "up": 1, "title": "47 files because the options multiply",
+     "body": "Module (dart, som, smarc), revision, carrier (sonata, symphony, echo), camera and M7 options combine, and each combination is a different board with its own DTB.\n\nU-Boot's `findfdt` picks yours at boot, giving `fdt_file=imx8mp-var-som-1.x-symphony.dtb`."},
+    {"anchor": "Rule of thumb: describe the chip once (SoC), the module once (SoM), and each carrier once. To support your own carrier board, you", "title": "Takeaway: write only layer 3",
+     "body": "Describe the chip once, the module once and each carrier once. For your own carrier, copy the Symphony `.dts` into `custom/dts/`, keep `#include \"imx8mp-var-som.dtsi\"`, and change what your board wires differently.\n\nOn the board, `ls /proc/device-tree` shows the result."}
+  ]
+}

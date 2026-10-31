@@ -1,0 +1,94 @@
+# Build the documentation site and publish it to GitHub Pages.
+#
+# One-time setup in the repository: Settings > Pages > Build and deployment > Source: "GitHub
+# Actions". For a private or internal repository, Pages needs a GitHub plan that supports it, and
+# the site's visibility is set in the same settings page.
+#
+# The "Latest builds" view on the downloads page is a static file, site/assets/releases.json, written
+# before every build by tools/release/fetch-releases.py (with the workflow's read-only token). So the site
+# is rebuilt, besides on documentation changes,
+#   * after the images workflow finished (it publishes the release, the site then lists it),
+#   * when a release is published by hand in the GitHub UI.
+# Releases created by the images workflow itself do not fire the `release` event (events caused by the
+# built-in GITHUB_TOKEN never start other workflows), which is why `workflow_run` is the main trigger.
+# Runs started by `release` have the tag as their ref: the github-pages environment must allow `v*` tags in
+# Settings > Environments > github-pages > Deployment branches and tags, or that deploy is refused.
+name: pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "boards/**/*.md"
+      - "boards/**/docs/**"
+      - "site/**"
+      - "mkdocs.yml"
+      - "requirements-docs.txt"
+      - "tools/build-site.py"
+      - "tools/release/fetch-releases.py"
+      - ".github/workflows/pages.yml"
+  release:
+    types: [published]
+  workflow_run:
+    workflows: [images]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  NO_MKDOCS_2_WARNING: "1"
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # a release event runs on the tag: build the current documentation instead of the tagged one
+          ref: ${{ github.event_name == 'release' && github.event.repository.default_branch || github.ref }}
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-docs.txt
+
+      - id: pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - name: list the latest releases for the downloads page (empty file if they cannot be read)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 tools/release/fetch-releases.py
+
+      - name: build the site
+        env:
+          # the real address of the site (a generated one for a private repository)
+          SITE_URL: ${{ steps.pages.outputs.base_url }}
+        run: |
+          pip install -r requirements-docs.txt
+          python3 tools/build-site.py --strict
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: build/site-out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

@@ -1,0 +1,21 @@
+{
+  "title": "Two ways software reaches a board",
+  "steps": [
+    {"anchor": null, "title": "The boot ROM decides how you flash",
+     "body": "Which model you get is decided by the silicon vendor's boot ROM and tooling, not by you. Everything else in the stack is the same.\n\nLeft is the SD-card image model, right is the vendor-flash model."},
+    {"anchor": "SD-card image model", "up": 2, "title": "SD-card model: build pieces, make one image",
+     "body": "Used by the i.MX 8M Plus and the STM32MP257F-DK. `./build.sh all` builds the boot firmware, U-Boot, kernel and rootfs into `build/deploy/`, and `image.sh` assembles ONE disk image with the bootloader at a fixed offset.\n\nThe PC only needs a card reader."},
+    {"anchor": "Write the image to an SD card", "up": 1, "title": "Flash, move the card, flip the switch",
+     "body": "`./build.sh flash` writes the card, then you set the boot switch to SD and power on. The Boot ROM reads the card by itself: ROM, firmware, U-Boot, Linux, all from the card.\n\nThe serial console is at 115200."},
+    {"anchor": "Fix a mistake: re-flash the card. The ROM runs first, so a bad card cannot brick it.", "title": "A bad card cannot brick the board",
+     "body": "The ROM runs before anything on the card, so re-flashing always recovers."},
+    {"anchor": "Vendor-flash model", "up": 2, "title": "Vendor-flash model: start from the vendor's package",
+     "body": "Used by the Jetson Orin Nano and many QSPI/eMMC-only SoCs. `./build.sh fetch` downloads the vendor's board support package (signed boot firmware, flashing tools, sample rootfs), and you add your kernel, device tree and rootfs changes into its staging tree."},
+    {"anchor": "Put the board in recovery mode", "up": 1, "title": "Recovery mode makes the ROM wait for the host",
+     "body": "A jumper or button plus a USB cable puts the Boot ROM in a state where it waits for the host (`lsusb` shows it). The vendor tool then flashes boot firmware into on-board flash and the OS into SD, NVMe or eMMC.\n\nAfter a reboot the firmware lives in the board's own flash, not on a card."},
+    {"anchor": "Fix a mistake: flash again. Recovery mode lives in the ROM (until you burn fuses).", "title": "Recovery stays available until fuses are burned",
+     "body": "Flash again to fix a mistake, because recovery mode is in the ROM. Burning fuses is what can remove that way back."},
+    {"anchor": "Why it matters: the SD-card model lets you iterate with one cheap card and see the whole build as one image. The vendor-flash model needs a Linux x86-64 host", "title": "Takeaway: cheap iteration vs. signed firmware",
+     "body": "The SD-card model lets you iterate with one cheap card. The vendor-flash model needs a Linux x86-64 host and vendor tools, but the firmware sits in on-board flash, so it can be signed and updated separately from the OS storage."}
+  ]
+}

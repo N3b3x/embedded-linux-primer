@@ -1,0 +1,5 @@
+
+# ---- Done ----
+
+# Ends the script; the board stays in U-Boot's fastboot mode until you power it off.
+FB: done

@@ -1,0 +1,13 @@
+
+# ---- Phase 2: aim U-Boot's fastboot at the on-module eMMC ----
+
+# fastboot_dev says which kind of storage "flash" writes to.
+FB: ucmd setenv fastboot_dev mmc
+# mmcdev is the device number; ${emmc_dev} is 2 in Variscite's U-Boot environment (uSDHC3, the on-module
+# eMMC). The SD card slot is 1, so a typo here can never reach a card in the slot.
+FB: ucmd setenv mmcdev ${emmc_dev}
+# Select it (user area, hardware partition 0). This fails, and the script stops, if there is no eMMC.
+FB: ucmd mmc dev ${emmc_dev}
+# Where "download" puts data in RAM and where "mmc write" reads it from: U-Boot's fastboot buffer
+# (CONFIG_FASTBOOT_BUF_ADDR, 1 GiB). Without this variable "mmc write ${fastboot_buffer}" has no address.
+FB: ucmd setenv fastboot_buffer @FB_BUF@

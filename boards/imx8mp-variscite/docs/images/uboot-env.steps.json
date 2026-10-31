@@ -1,0 +1,19 @@
+{
+  "title": "Where U-Boot's variables come from",
+  "steps": [
+    {"anchor": null, "title": "Four layers, later ones win",
+     "body": "U-Boot's settings, such as `bootcmd`, `fdt_file`, `console` and `kernelargs`, are variables. Each can come from any of four layers, and the higher layer wins.\n\nThe panel on the right shows what this board actually did."},
+    {"anchor": "Compiled-in default", "up": 1, "title": "1. The default is baked into u-boot.bin",
+     "body": "It comes from `board/variscite/imx8mp_var_dart/imx8mp_var_dart.env` and is always present. You can read the result in `build/deploy/u-boot-initial-env`.\n\nIt is used when nothing else exists."},
+    {"anchor": "Saved environment", "up": 1, "title": "2. A saved environment replaces layer 1 entirely",
+     "body": "`saveenv` writes 16 KiB at 7 MiB on the boot device (`CONFIG_ENV_OFFSET = 0x700000`), protected by a CRC. If the CRC is valid it **replaces** the default completely, not just selected variables.\n\nReset it with `env default -a; saveenv`."},
+    {"anchor": "/boot/uEnv.txt", "up": 1, "title": "3. uEnv.txt overrides only what it lists",
+     "body": "`bsp_bootcmd` imports this plain `name=value` file from partition 1 on every boot. For example `kernelargs=loglevel=8` changes just that one variable.\n\nIt is the safest way to experiment: delete the file to undo."},
+    {"anchor": "Typed at the prompt", "up": 1, "title": "4. The prompt wins, until reset",
+     "body": "Stop autoboot with any key, then use `setenv`, `printenv` and `run`. For example `setenv kernelargs quiet` followed by `boot`.\n\nThe change is lost on reset unless you `saveenv`."},
+    {"anchor": "ON YOUR BOARD", "up": 1, "title": "On this board only layer 1 was ever used",
+     "body": "The first boot printed `bad CRC, using default environment`, so nothing was ever saved. Then `Failed to load '/boot/uEnv.txt'` shows there is no layer 3 either.\n\nSo every value came from the defaults this repository compiled. This is normal."},
+    {"anchor": "Safest way to experiment: put one line in /boot/uEnv.txt (mount the card on your PC, or edit it on the board) and reboot. Delete the file to undo.", "title": "Takeaway: experiment with one line in uEnv.txt",
+     "body": "Mount the card on your PC or edit the file on the board, then reboot. If you broke a saved environment, stop autoboot and run `env default -a; saveenv; reset`.\n\nFrom Linux, `fw_printenv` reads the variables."}
+  ]
+}

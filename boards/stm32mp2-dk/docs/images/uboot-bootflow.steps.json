@@ -1,0 +1,25 @@
+{
+  "title": "How U-Boot finds Linux",
+  "steps": [
+    {"anchor": null, "title": "No hand-written boot script: generic distro boot does it",
+     "body": "ST's default U-Boot environment runs U-Boot's generic \"distro boot\", which searches for `/boot/extlinux/extlinux.conf` and boots whatever it describes. Nothing here is specific to this repository except the contents of that file and the partition flags.\n\nThe six steps on the left run in order. The right column shows the file it reads, how to debug a failure, and why one GPT flag matters."},
+    {"anchor": "boot_device, boot_instance", "title": "1. U-Boot asks the ROM where it came from",
+     "body": "In `arch/arm/mach-stm32mp/stm32mp2/cpu.c`, U-Boot reads the Boot ROM's boot context. For an SD card `boot_device` is `mmc`, and `boot_instance` says which SDMMC controller.\n\nThose two variables decide which device is searched later."},
+    {"anchor": "bootcmd = run bootcmd_stm32mp", "title": "2. After a 1 second countdown the default command runs",
+     "body": "`BOOTDELAY=1` gives a one second countdown (any key stops it and gives the prompt `STM32MP> `). `bootcmd_stm32mp` prints `Boot over mmc0!`.\n\nStopping here is how you debug by hand."},
+    {"anchor": "boot_targets = mmc<boot_instance>", "title": "3. Only the device we booted from is tried",
+     "body": "`include/configs/stm32mp25_st_common.h` sets `boot_targets` to the MMC instance that U-Boot was loaded from, then runs `distro_bootcmd`."},
+    {"anchor": "scan_dev_for_boot_part", "title": "4. Only partitions with the bootable flag are scanned",
+     "body": "`part list mmc N -bootable devplist` collects the partitions that have the bootable flag. If there are none, `devplist` is 1: partition 1, which here is BL2 and not a filesystem.\n\nThat would make U-Boot search the wrong place and find nothing."},
+    {"anchor": "for prefix in \"/ /boot/\"", "title": "5. It looks for extlinux.conf under two prefixes",
+     "body": "For each prefix, `/` and `/boot/`, U-Boot checks whether `<prefix>extlinux/extlinux.conf` exists. If it does, it runs `sysboot`.\n\nIf not, it tries `boot.scr.uimg` and `boot.scr`; this repository does not ship one."},
+    {"anchor": "sysboot → booti", "title": "6. sysboot reads the file and booti starts the kernel",
+     "body": "`sysboot` parses `extlinux.conf`: `LINUX` goes to `kernel_addr_r` `0x8A000000`, `FDT` to `fdt_addr_r` `0x90000000`, and `APPEND` becomes `bootargs`. Then `booti 0x8A000000 - 0x90000000` hands over to Linux.\n\nThe `-` in the middle means no ramdisk."},
+    {"anchor": "/boot/extlinux/extlinux.conf", "up": 1, "title": "The one file this repository writes",
+     "body": "`LINUX` is the kernel, `FDT` the device tree and `APPEND` the kernel command line: the root is given as `root=PARTUUID=6d70326b-0000-4000-8000-000000000001` (a partition's unique ID), the console is `ttySTM0,115200`, and `rootwait rw` waits for the card and mounts it read-write.\n\nIf these names are wrong, U-Boot cannot load the kernel or Linux cannot find its root."},
+    {"anchor": "If it does not boot, read the log", "up": 1, "title": "The log tells you which step failed",
+     "body": "\"Scanning mmc 0:5...\" means a partition is being tried, \"Found /boot/extlinux/extlinux.conf\" means step 5 worked, and \"Retrieving file: /boot/Image\" means sysboot is loading.\n\nNothing after \"Boot over mmc0!\" points to a missing bootable flag, a wrong `boot_instance`, or a rootfs that is not ext4. Stop autoboot and try `part list mmc 0` and `ls mmc 0:5 /boot`."},
+    {"anchor": "Why the bootable flag matters", "up": 1, "title": "Takeaway: one flag on rootfs makes the whole search work",
+     "body": "`scripts/image.sh` sets the GPT attribute LegacyBIOSBootable (bit 2) on the rootfs partition only, and U-Boot's `part list -bootable` reads exactly that bit.\n\nWithout it U-Boot would scan partition 1, `fsbla1`, which holds BL2."}
+  ]
+}

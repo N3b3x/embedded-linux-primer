@@ -1,0 +1,21 @@
+{
+  "title": "Who runs where on the i.MX 8M Plus",
+  "steps": [
+    {"anchor": null, "title": "Two worlds, four levels, and one gate between them",
+     "body": "The picture has two columns: the **normal world** (where Linux runs) and the **secure world** (TrustZone's protected side). Rows are exception levels, EL3 at the top being the most privileged. Only code at EL3 can move the CPU between the two worlds.\n\nThe arrows are the instructions that cross levels. The right-hand panel and the boot log below the diagram show what this board really does."},
+    {"anchor": "TF-A · BL31 · secure monitor", "up": 1, "title": "BL31 is the gate and the only secure code here",
+     "body": "BL31 handles every `smc`: PSCI (powering CPUs on and off, suspend, reset) and i.MX SiP (silicon-provider) calls, and it forwards OP-TEE calls when a BL32 exists. It lives in on-chip RAM (OCRAM) at `0x0097_0000` for as long as the board is on.\n\nWithout it Linux could not start its other CPU cores."},
+    {"anchor": ["OP-TEE OS · BL32", "Trusted Applications"], "up": 1, "title": "OP-TEE and trusted apps are drawn, but not built",
+     "body": "OP-TEE is a small trusted OS that would run at S-EL1, with trusted applications for key handling, signing and secure storage above it, its memory locked by the TZASC. This image does not include it.\n\nThere is also no S-EL2: the Cortex-A53 is Armv8.0, which has no secure hypervisor level."},
+    {"anchor": "U-Boot proper · BL33", "up": 1, "title": "EL2 holds U-Boot, then Linux's hypervisor stub",
+     "body": "U-Boot proper (BL33) runs at EL2 during boot only. Then Linux keeps EL2 for a small hypervisor stub (KVM in `nVHE` mode) and runs the real kernel one level down.\n\nThis is why the hypervisor row is occupied even though this image runs no virtual machines."},
+    {"anchor": "Linux kernel 6.18", "up": 1, "title": "The kernel enters at EL2 and runs at EL1",
+     "body": "Drivers, scheduler, memory management and filesystems all live at EL1, the normal OS level. Everything above it in privilege is firmware.\n\nUser space (init, getty, sh, BusyBox, your application) runs at EL0 and can never execute `smc` itself."},
+    {"anchor": "THE ONLY WAYS TO CHANGE LEVEL", "up": 1, "title": "Four instructions cross levels",
+     "body": "`svc` is an app calling the kernel (open, read, ioctl), `hvc` goes to EL2 and is not used by this image beyond the boot stub, and `smc` goes from the kernel to BL31 with the function ID in `x0` and arguments in `x1`-`x7`. `eret` is the way back down, into the world and level BL31 chose.\n\nMoving up is always a deliberate trap into code the higher level chose."},
+    {"anchor": "PROOF FROM THIS BOARD'S BOOT LOG", "up": 1, "title": "The boot log proves BL31 is there and OP-TEE is not",
+     "body": "`psci: PSCIv1.1 detected in firmware` means Linux asked BL31 by `smc` and got an answer. `CPUs 1-3` were started by `PSCI CPU_ON` calls (`x0 = 0xC400_0003`), and `kvm: Hyp nVHE mode initialized` shows Linux kept EL2.\n\nThe `OP-TEE api uid mismatch` line shows U-Boot probed for OP-TEE and BL31 had nothing to forward to, so the secure world here is BL31 alone."},
+    {"anchor": "SMC function IDs follow Arm's SMCCC:", "up": 1, "title": "Function IDs tell you who answers",
+     "body": "Arm's SMC calling convention puts the function ID in `x0`. IDs starting `0xC4` are 64-bit PSCI calls and `0xC2` are NXP SiP calls, so you can read a trace and know which service was asked. The commands at the bottom of the panel let you check all of this on the real board."}
+  ]
+}

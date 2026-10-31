@@ -1,0 +1,25 @@
+{
+  "title": "Inside fip.bin",
+  "steps": [
+    {"anchor": null, "title": "One file, eight images, one table of contents",
+     "body": "A FIP (Firmware Image Package) is a ToC (table of contents) followed by the images it lists. Each ToC entry has a UUID, an offset and a size, and BL2 asks for each image by UUID.\n\nThe bar on top shows `fip.bin` to scale (1,999,368 bytes). The table below gives, for each image, its offset, size, the `fiptool` flag that packs it, the `make` argument that supplies it, and where BL2 loads it."},
+    {"anchor": "rect:40,138,1320,56", "title": "Two images are almost the whole file",
+     "body": "OP-TEE (690.4 KiB) and U-Boot (1,105.7 KiB) fill nearly the entire bar. The rest are small: some are thinner than one pixel and are drawn 3 px wide so they stay visible.\n\nThe whole file ends at `0x1E8208`, which is why the partition holding it, 4 MiB, has plenty of room."},
+    {"anchor": "ToC (416 bytes)", "exact": true, "pad": 20, "title": "The ToC comes first and is only 416 bytes",
+     "body": "The table of contents sits at offset 0 and lists every image with its UUID, offset and size. The first image, BL31, starts at `0x1A0`, which is exactly 416.\n\nWithout the table BL2 would have no way to find an image inside the file."},
+    {"anchor": "IMAGE", "title": "Each row says how an image is packed and where it goes",
+     "body": "`fiptool FLAG` is the option that adds the image when the FIP is built, for example `--nt-fw`. `make ARGUMENT` is the build variable that tells TF-A which file to use, for example `BL33=`. The last columns give the address BL2 loads it to and what the image is.\n\nImages marked 'built from fdts/' are made from device tree sources in the TF-A tree."},
+    {"anchor": "BL31", "title": "BL31 is loaded into SYSRAM",
+     "body": "BL31 (46,384 bytes, flag `--soc-fw`) is TF-A's resident secure monitor, loaded by BL2 to SYSRAM `0x0E000000`. SYSRAM is the chip's small on-chip RAM.\n\nIt is built together with BL2, so no `make` argument is needed (marked 'built by all')."},
+    {"anchor": ["28-byte header that tells BL31 how to start OP-TEE", "the trusted OS image (tee-pager_v2.bin), SCMI server inside"], "title": "OP-TEE is two images: a header and the OS",
+     "body": "A 28-byte header (`--tos-fw`, `BL32=`) tells BL31 how to start OP-TEE. The OS itself is `tee-pager_v2.bin` (706,944 bytes, `--tos-fw-extra1`, `BL32_EXTRA1=`), with the SCMI server inside.\n\nBoth go to DDR `0x82000000`. Without the header BL31 would not know how to hand control to the trusted OS."},
+    {"anchor": ["u-boot-nodtb.bin, the normal-world bootloader (BL33)", "u-boot.dtb, U-Boot's own device tree"], "title": "U-Boot travels with its own device tree",
+     "body": "`u-boot-nodtb.bin` (1,132,200 bytes, `--nt-fw`, `BL33=`) is the normal-world bootloader and goes to DDR `0x84000000`. It is the biggest part of the FIP.\n\n`u-boot.dtb` (65,488 bytes, `--hw-config`, `BL33_CFG=`) is U-Boot's device tree, placed at DDR `0x84400000`."},
+    {"anchor": ["BL2's load plan: where each image goes", "BL31's own device tree (SoC settings for the monitor)"], "title": "Two small device trees steer the loaders",
+     "body": "`fw-config` (806 bytes, `--fw-config`) is BL2's load plan: it says where each image goes. It is read to SYSRAM `0x0E000000`.\n\nThe BL31 DTB (12,718 bytes, `--soc-fw-config`) holds the SoC settings for the monitor. Both are built from `fdts/` in the TF-A tree."},
+    {"anchor": "lpddr4_pmu_train.bin: the memory controller's training code", "title": "The DDR firmware must be loaded before main memory works",
+     "body": "`lpddr4_pmu_train.bin` (34,384 bytes, `--ddr-fw`, supplied by `STM32MP_DDR_FW_PATH`) is the code that trains the LPDDR4 memory controller. BL2 loads it to SRAM1 at `0x0E040000`, which is on-chip, because DDR is not usable yet.\n\nWithout it BL2 cannot bring up main RAM and cannot load the images that go there."},
+    {"anchor": "Three facts worth remembering", "title": "Takeaway: BL2 is not in here, and the file is small",
+     "body": "BL2 is NOT in the FIP: the Boot ROM loaded it from `fsbla1` beforehand. `tee-pageable_v2.bin` is 0 bytes here because OP-TEE paging is off, so it is not packed.\n\nThe FIP partition is 4 MiB and this FIP uses about 2.0 MB, U-Boot being the biggest part."}
+  ]
+}

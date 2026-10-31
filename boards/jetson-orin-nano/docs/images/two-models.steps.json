@@ -1,0 +1,73 @@
+{
+ "title": "Write a card, or flash over USB",
+ "steps": [
+  {
+   "anchor": null,
+   "title": "Same goal, two different divisions of labour",
+   "body": "The picture compares the two ways this repository gets Linux onto a board. The left side is the SD-card model, used by the i.MX 8M Plus and STM32MP2 boards. The right side is the vendor-flash model of the Jetson Orin Nano.\n\nBoth go through the same five verbs, Build, Assemble, Write, Insert and Boot, but what each verb means differs. The table at the bottom lists what that changes for you."
+  },
+  {
+   "anchor": "rect:32,100,656,420",
+   "title": "SD-card boards build one file and write it to a card",
+   "body": "The scripts compile the bootloader, kernel and root filesystem and assemble ONE file, `sdcard.img`, with the bootloader at a fixed offset and an ext4 root filesystem. You write it with `dd` or `bmaptool` from any PC with a card reader.\n\nAfter inserting the card and setting the boot switch to SD, the BootROM reads the card. The card holds all the boot firmware, so re-writing it fixes almost anything."
+  },
+  {
+   "anchor": "rect:712,100,656,420",
+   "title": "The Jetson builds a flash package, not an image",
+   "body": "You build a kernel (optional) and a root filesystem inside `Linux_for_Tegra/`, while NVIDIA ships the boot firmware as binaries. `l4t_initrd_flash.sh --no-flash` then generates a flash package: signed images plus an initrd.\n\nThe package is written over USB-C with the board in recovery mode, from an x86-64 Ubuntu host with NVIDIA's tools. The SD, NVMe or USB drive is just the root device, and the board itself writes it, through NFS."
+  },
+  {
+   "anchor": [
+    "BootROM → loaders on the card → Linux",
+    "BootROM → QSPI-NOR firmware → UEFI → Linux"
+   ],
+   "title": "The Jetson boots from the module, not from the drive",
+   "body": "On the Jetson the BootROM reads firmware from the module's QSPI-NOR flash, then UEFI, then Linux. The module holds all boot firmware.\n\nOn the SD-card boards the BootROM goes straight to loaders stored on the card. This one difference explains most of the other rows."
+  },
+  {
+   "anchor": [
+    "First-stage firmware lives…",
+    "on the SD card (or eMMC)",
+    "in the module's 64 MiB QSPI-NOR flash, never on the root device"
+   ],
+   "title": "Where the first-stage firmware lives sets everything else",
+   "body": "SD-card boards keep it on the SD card (or eMMC). The Jetson keeps it in the module's 64 MiB QSPI-NOR flash, never on the root device.\n\nSo on the Jetson you can swap or wipe the root drive without touching the firmware, and firmware changes need a flash through recovery mode."
+  },
+  {
+   "anchor": [
+    "A bricked OS is fixed by…",
+    "re-writing the card in any PC",
+    "recovery mode + USB: the tool rewrites firmware and OS"
+   ],
+   "title": "Recovery differs: re-write a card or use recovery mode",
+   "body": "A broken SD-card board is fixed by re-writing the card in any PC. A broken Jetson is fixed with recovery mode and USB, where the tool rewrites firmware and OS together.\n\nRecovery mode is a state in which the BootROM waits for a PC on USB instead of loading from flash, so it works even when the flash content is damaged."
+  },
+  {
+   "anchor": [
+    "Changing the boot firmware…",
+    "rebuild U-Boot / TF-A from source, re-write the image",
+    "flash a new package; UEFI source (NVIDIA/edk2-nvidia) is public, MB1/MB2 are binary"
+   ],
+   "title": "Changing the bootloader means different work",
+   "body": "On SD-card boards you rebuild U-Boot and TF-A from source and re-write the image. On the Jetson you flash a new package. The UEFI source (NVIDIA/edk2-nvidia) is public, but MB1 and MB2 are binaries.\n\nThis is the price of NVIDIA's ready-made, signed firmware: you cannot read or rebuild every stage."
+  },
+  {
+   "anchor": [
+    "Your PC must be…",
+    "any Linux, x86-64 or ARM64",
+    "x86-64 Ubuntu (NVIDIA names 20.04 and 22.04)",
+    "The 'image' you ship is…",
+    "one file (+ .bmap)",
+    "a Linux_for_Tegra tree and its generated flash package (several GB)"
+   ],
+   "title": "The host PC is more constrained on the Jetson",
+   "body": "SD-card boards accept any Linux PC, x86-64 or ARM64. The Jetson needs an x86-64 Ubuntu host (NVIDIA names 20.04 and 22.04).\n\nThe thing you ship also differs: one file plus a `.bmap` against a `Linux_for_Tegra` tree and its generated flash package, which is several GB."
+  },
+  {
+   "anchor": "Neither model is better",
+   "title": "Neither model is better, and this repository uses both",
+   "body": "The SD-card flow shows every byte of the boot. The Jetson flow trades that visibility for fail-safe A/B boot firmware and a recovery path that does not need the OS.\n\nThe SD-card boards of this repository work the other way round, with the card as disk and firmware together. See the chapter on the two build models.",
+   "pad": 10
+  }
+ ]
+}

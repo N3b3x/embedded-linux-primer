@@ -1,0 +1,96 @@
+{
+ "title": "Where everything lives on a Jetson Orin Nano",
+ "steps": [
+  {
+   "anchor": null,
+   "title": "Two storage devices, each with its own partition table",
+   "body": "The left side is the 64 MiB QSPI-NOR flash soldered on the module, which holds the boot firmware. The right side is the root device you attach (SD card, NVMe SSD or USB drive), which holds the kernel files and the operating system.\n\nSizes are read from NVIDIA's partition files: `bootloader/generic/cfg/flash_t234_qspi.xml` and `tools/kernel_flash/flash_l4t_t234_nvme.xml`."
+  },
+  {
+   "anchor": [
+    "QSPI-NOR flash on the module",
+    "chain A  30.75 MiB",
+    "chain B  30.75 MiB"
+   ],
+   "title": "QSPI-NOR holds two complete boot chains",
+   "body": "QSPI-NOR is a small flash chip on the module that is always the boot device. It is split into chain A (30.75 MiB) and chain B (30.75 MiB), plus `BCT` (1 MiB) and about 1.4 MiB for UEFI variables, UEFI FTW, reserved space, the backup GPT and version info.\n\nTwo complete chains give fail-safe boot-firmware updates: NVIDIA states that bootloader redundancy is enabled by default."
+  },
+  {
+   "anchor": [
+    "A_mb1",
+    "A_psc_bl1",
+    "A_MB1_BCT",
+    "A_MEM_BCT",
+    "A_mb2",
+    "A_cpu-bootloader"
+   ],
+   "title": "The first six partitions are the boot stages",
+   "body": "In blue: `A_mb1` (512 KiB), `A_psc_bl1` (256 KiB), `A_MB1_BCT` and `A_MEM_BCT` (the configuration tables), `A_mb2` (512 KiB) and `A_cpu-bootloader` (3.5 MiB). These are MB1, MB2 and UEFI from the boot-chain diagram.\n\nUEFI has only 3.5 MiB, so a custom logo or extra drivers must still fit in that size."
+  },
+  {
+   "anchor": [
+    "A_secure-os",
+    "A_eks",
+    "A_bpmp-fw",
+    "A_bpmp-fw-dtb",
+    "A_psc-fw",
+    "A_spe-fw",
+    "A_rce-fw",
+    "A_dce-fw",
+    "A_adsp-fw",
+    "A_pva-fw",
+    "A_mts-mce",
+    "A_tsec-fw",
+    "A_nvdec",
+    "A_xusb-fw"
+   ],
+   "title": "Secure OS, keys and the other cores' firmware fill the rest of the chain",
+   "body": "Red: `A_secure-os` (4 MiB) holds the OP-TEE secure OS, and `A_eks` (256 KiB) is in the legend's 'secure OS · keys' group. Orange: the chip has processors besides the Arm cores (BPMP, PSC, SPE, RCE, DCE, ADSP, PVA and more), and each loads its own firmware, from `A_bpmp-fw` (1.5 MiB) to `A_dce-fw` (5 MiB) and `A_xusb-fw` for USB 3.\n\n`A_sc7` is the resume-from-suspend firmware, and the grey `A_reserved_on_boot` (1.06 MiB) is reserved space. Chain B has identical copies of all of them."
+  },
+  {
+   "anchor": [
+    "Root device: SD card · NVMe SSD · USB drive",
+    "primary_gpt",
+    "secondary_gpt"
+   ],
+   "title": "The root device has one GPT written by the flash tool",
+   "body": "A GPT is a partition table. `primary_gpt` (19.5 KiB) sits at the start of the drive and `secondary_gpt` is the backup copy at the end.\n\nThe flash tool writes the table and every partition, so you never partition this drive by hand."
+  },
+  {
+   "anchor": [
+    "A_kernel",
+    "A_kernel-dtb",
+    "B_kernel · B_kernel-dtb · B_reserved…",
+    "recovery kernel + dtb"
+   ],
+   "title": "Kernel partitions exist, but the default boot does not use them",
+   "body": "`A_kernel` is 128 MiB and holds the kernel for the 'boot from partitions' mode, with `A_kernel-dtb` (768 KiB) as its device tree. There is a second copy under `B_`, and a recovery kernel and dtb for the recovery boot mode.\n\nThe kernel partitions serve the other boot modes, but the flash tool fills them anyway."
+  },
+  {
+   "anchor": "esp",
+   "up": 0,
+   "title": "The ESP holds L4TLauncher",
+   "body": "`esp` (64 MiB) is the EFI System Partition, a small FAT partition that UEFI can read. It contains `EFI\\BOOT\\BOOTAA64.efi`, which is L4TLauncher.\n\nWithout it UEFI has no OS loader to start from the drive. `recovery_alt`, `dtb_alt` and `esp_alt` are spare copies."
+  },
+  {
+   "anchor": [
+    "APP",
+    "UDA"
+   ],
+   "title": "APP is the root filesystem and takes the rest of the drive",
+   "body": "`APP` is the ext4 root filesystem: `/boot/Image`, `/boot/extlinux`, `/lib/modules` and the rest of the system. It gets all the space left over.\n\n`UDA` (400 MiB) is a user data area that you mount yourself or leave empty, and a 479.5 MiB `reserved` block sits between it and `APP`."
+  },
+  {
+   "anchor": "Default boot path (L4TDefaultBootMode = 1):",
+   "up": 1,
+   "title": "The default boot path touches only ESP and APP",
+   "body": "UEFI runs `esp:\\EFI\\BOOT\\BOOTAA64.efi` (L4TLauncher), which reads `APP:/boot/extlinux/extlinux.conf` and loads `/boot/Image` and `/boot/initrd`.\n\nThe kernel partitions are not on this path unless you change the boot mode."
+  },
+  {
+   "anchor": "Compare with an SD-card board",
+   "pad": 10,
+   "title": "The device only holds the OS",
+   "body": "On an SD-card board one file, `sdcard.img`, holds the bootloader at a fixed offset and one ext4 partition. Here the boot firmware is on the module.\n\nSo you can swap the root device, wipe it or boot from NVMe without touching the firmware."
+  }
+ ]
+}

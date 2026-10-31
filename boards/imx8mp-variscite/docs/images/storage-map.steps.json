@@ -1,0 +1,58 @@
+{
+  "title": "One SD card, three names",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "Same hardware, a different number in each layer",
+      "body": "The i.MX 8M Plus has three SD/MMC controllers. The Boot ROM, U-Boot and Linux each number them differently.\n\nRead one row left to right to see all the names for the same device."
+    },
+    {
+      "anchor": "uSDHC1",
+      "title": "uSDHC1 is the Wi-Fi slot",
+      "body": "At `0x30B4_0000` it is wired to the optional Wi-Fi/BT module (SDIO), is not a boot device and is `mmc0` in Linux. The message `Failed to initialize a non-removable card` is harmless when no Wi-Fi chip is fitted.",
+      "up": 2
+    },
+    {
+      "anchor": "uSDHC2",
+      "title": "uSDHC2 is the SD card slot",
+      "body": "At `0x30B5_0000` on the carrier board. With the boot switch on SD the Boot ROM reads it at 32 KiB; U-Boot calls it `mmc 1` and Linux `/dev/mmcblk1`.",
+      "up": 2
+    },
+    {
+      "anchor": "└ mmcblk1p1 → mounted as /  (root=/dev/mmcblk1p1)",
+      "title": "Partition 1 becomes /",
+      "body": "The root filesystem is `mmcblk1p1`, set by `root=/dev/mmcblk1p1`. This repository writes `imx-boot.bin` at the start and an ext4 partition labelled root at 8 MiB.",
+      "up": 1
+    },
+    {
+      "anchor": "./build.sh flash -d /dev/sdX --expand",
+      "title": "On your PC it is /dev/sdX",
+      "body": "The numbering `mmcblk1` exists only on the board. On your PC the same card has a name like `/dev/sdX`, so check the device before flashing: the wrong one destroys its data.",
+      "up": 1
+    },
+    {
+      "anchor": "uSDHC3",
+      "title": "uSDHC3 is the on-module eMMC",
+      "body": "At `0x30B6_0000`, 29 GiB on this VAR-SOM, `mmc 2` in U-Boot and `/dev/mmcblk2` in Linux. With the boot switch on eMMC the Boot ROM reads it instead.",
+      "up": 2
+    },
+    {
+      "anchor": "├ mmcblk2boot0, boot1 (4 MiB each, imx-boot at offset 0)",
+      "title": "Hardware partitions",
+      "body": "`boot0` and `boot1` are small hardware boot partitions and `rpmb` is a replay-protected area for secure storage. The Boot ROM reads `imx-boot.bin` from offset 0 of a boot partition when the eMMC is configured to boot from it (`./build.sh uuu emmc` does this); see [chapter 16](../16-booting-from-emmc-with-uuu.md).",
+      "up": 1
+    },
+    {
+      "anchor": "over USB: ./build.sh uuu emmc (docs/16); or user area from SD:",
+      "title": "Two ways to fill the eMMC",
+      "body": "Over USB, `./build.sh uuu emmc` writes the user area and the boot partitions and sets the boot configuration. From a board booted from SD, `dd if=sdcard.img of=/dev/mmcblk2 bs=4M` writes the user area only, which boots only while no boot partition is enabled. U-Boot passes `root=/dev/mmcblk2p1` itself. The eMMC is blank today, with no partition table.",
+      "up": 1
+    },
+    {
+      "anchor": "Check on the board:",
+      "title": "Takeaway: check the names on the board",
+      "body": "Use `cat /proc/partitions` or `mmc list` in U-Boot before writing anything, since the same card has three names depending on who is asking.",
+      "up": 1
+    }
+  ]
+}

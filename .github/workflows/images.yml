@@ -1,0 +1,411 @@
+# Ready-built boot images, built on demand and published as a GitHub Release.
+#
+# This workflow NEVER runs on a branch push or a pull request: a full firmware build takes one to three
+# hours of runner time per image. It runs only
+#   * when you start it by hand (Actions > images > Run workflow), or
+#   * when you push a tag that starts with "v" (git tag v1.2.0 && git push origin v1.2.0).
+#
+# Publishing makes TWO releases per tag, so that the stable download links only ever serve verified images:
+#   <tag>          normal release: only images whose board/variant has "verified_on_hardware": true in images.json
+#   <tag>-preview  pre-release: everything not verified (created only when something unverified was built)
+# GitHub's releases/latest/download/... skips pre-releases, hence the split.
+#
+# What is built is described in tools/release/images.json (one entry per board and variant). Adding a board
+# is one JSON entry; nothing in this file changes.
+#
+# Runner limits, the honest version:
+#   * A standard GitHub-hosted Linux runner in a PRIVATE or INTERNAL repository has 2 vCPU, 8 GB RAM and a
+#     14 GB SSD (GitHub documents 4 vCPU / 16 GB for public repositories). A job may run for at most 6 hours.
+#     The Debian images fit after the preinstalled toolchains are deleted below; the build checks the free
+#     disk and says so when it does not.
+#   * The Jetson full flash package (NVIDIA board support package plus root filesystem, 40-60 GB, needs sudo
+#     and loop mounts) can NOT be built here; whether NVIDIA's licence allows publishing it is for legal to decide.
+#     Only the kernel bundle is built for that board.
+#   * Larger runners (GitHub Team or Enterprise Cloud) are chosen through repository variables, no edit needed:
+#       IMAGES_RUNNER        runner label for entries with "standard_runner": true  (default ubuntu-24.04)
+#       IMAGES_RUNNER_LARGE  runner label for entries with "standard_runner": false (default ubuntu-24.04)
+#
+# Artifacts of a run are kept 14 days. The Release is the durable copy (it does not expire).
+name: images
+run-name: images ${{ github.ref_name }}${{ inputs.publish && ' (publish)' || '' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      boards:
+        description: 'Boards to build, comma separated (names from tools/release/images.json), or "all"'
+        type: string
+        default: all
+      variants:
+        description: 'Variants to build (debian, alpine, kernel, ...), comma separated, or "all"'
+        type: string
+        default: all
+      publish:
+        description: 'Create or update a GitHub Release from the result (needs a tag name)'
+        type: boolean
+        default: false
+      tag:
+        description: 'Release tag when publishing, for example v1.2.0 (created on this commit if it does not exist)'
+        type: string
+        default: ''
+      reproducibility_check:
+        description: 'Also build the cheap parts (firmware, bootloader) twice in separate directories and compare'
+        type: boolean
+        default: false
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CCACHE_MAXSIZE: 1G
+
+jobs:
+  # ---------------------------------------------------------------------------
+  plan:
+    name: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      has_jobs: ${{ steps.plan.outputs.has_jobs }}
+      repro_matrix: ${{ steps.repro.outputs.repro_matrix }}
+      has_repro: ${{ steps.repro.outputs.has_repro }}
+      tag: ${{ steps.meta.outputs.tag }}
+      publish: ${{ steps.meta.outputs.publish }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: decide tag and whether to publish
+        id: meta
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          IN_PUBLISH: ${{ inputs.publish }}
+          IN_TAG: ${{ inputs.tag }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = push ]; then
+            publish=true; tag=$REF_NAME
+          else
+            publish=${IN_PUBLISH:-false}; tag=${IN_TAG:-}
+          fi
+          if [ "$publish" = true ]; then
+            case $tag in *-preview) echo "::error::the tag must not end in -preview: that suffix is added to the pre-release of unverified images"; exit 1 ;; esac
+            if ! printf '%s' "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)*$'; then
+              echo "::error::publishing needs a tag like v1.2.0 (got '$tag')"; exit 1
+            fi
+          elif [ -z "$tag" ]; then
+            tag="dev-$RUN_NUMBER"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+
+      - name: build matrix from tools/release/images.json
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          IN_BOARDS: ${{ inputs.boards }}
+          IN_VARIANTS: ${{ inputs.variants }}
+        run: |
+          set -euo pipefail
+          boards=all; variants=all
+          if [ "$EVENT" = workflow_dispatch ]; then boards=${IN_BOARDS:-all}; variants=${IN_VARIANTS:-all}; fi
+          python3 tools/release/matrix.py -b "$boards" -v "$variants" --github-output "$GITHUB_OUTPUT" > "$RUNNER_TEMP/matrix.json"
+          if ! grep -q '"name"' "$RUNNER_TEMP/matrix.json"; then
+            echo "::error::boards='$boards' variants='$variants' select no enabled image (see tools/release/images.json)"; exit 1
+          fi
+          {
+            echo "### Plan"; echo
+            python3 tools/release/matrix.py -b "$boards" -v "$variants" --list | grep ' enabled ' | sed 's/^/    /'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: matrix for the reproducibility check
+        id: repro
+        env:
+          WANT: ${{ inputs.reproducibility_check }}
+          IN_BOARDS: ${{ inputs.boards }}
+        run: |
+          set -euo pipefail
+          if [ "${WANT:-false}" = true ]; then
+            python3 tools/release/matrix.py --repro -b "${IN_BOARDS:-all}" --github-output "$GITHUB_OUTPUT" > /dev/null
+          else
+            { echo 'repro_matrix={"include":[]}'; echo 'has_repro=false'; } >> "$GITHUB_OUTPUT"
+          fi
+
+  # ---------------------------------------------------------------------------
+  build:
+    name: build · ${{ matrix.name }}
+    needs: plan
+    if: needs.plan.outputs.has_jobs == 'true'
+    runs-on: ${{ matrix.standard_runner && (vars.IMAGES_RUNNER || 'ubuntu-24.04') || (vars.IMAGES_RUNNER_LARGE || 'ubuntu-24.04') }}
+    timeout-minutes: ${{ matrix.timeout }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      RELEASE_TAG: ${{ needs.plan.outputs.tag }}
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: build date from the commit (SOURCE_DATE_EPOCH)
+        run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct HEAD)" >> "$GITHUB_ENV"
+
+      - name: free disk space (delete preinstalled toolchains this build never uses)
+        env:
+          NEED_GB: ${{ matrix.disk_gb }}
+        run: |
+          set -euo pipefail
+          df -h / | tail -n 1
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/powershell /usr/local/share/chromium /usr/share/swift
+          sudo docker image prune --all --force > /dev/null 2>&1 || true
+          sudo apt-get clean
+          df -h / | tail -n 1
+          free_gb=$(df --output=avail -BG / | tail -n 1 | tr -dc '0-9')
+          echo "free disk: ${free_gb} GB, this image needs about ${NEED_GB} GB"
+          if [ "$free_gb" -lt "$NEED_GB" ]; then
+            echo "::error::only ${free_gb} GB free, ${NEED_GB} GB needed. Set the repository variable IMAGES_RUNNER (or IMAGES_RUNNER_LARGE) to a larger runner."
+            exit 1
+          fi
+
+      - name: allow rootless mmdebstrap (Ubuntu 24.04 restricts unprivileged user namespaces)
+        if: matrix.kind != 'kernel-bundle'
+        run: |
+          # Ubuntu 24.04 turns on kernel.apparmor_restrict_unprivileged_userns, which stops mmdebstrap's
+          # rootless "unshare" mode (it needs a user namespace with capabilities). The documented switch is
+          # this sysctl (Ubuntu 24.04 release notes; Ubuntu blog "Restricted unprivileged user namespaces").
+          # It only changes this throw-away runner.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: host packages
+        env:
+          BOARD_DIR: ${{ matrix.dir }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ccache zip xz-utils bmap-tools jq
+          (cd "$BOARD_DIR" && ./build.sh --yes deps --install)
+
+      - name: arm64 emulation is registered
+        if: matrix.kind != 'kernel-bundle'
+        run: |
+          if [ ! -e /proc/sys/fs/binfmt_misc/qemu-aarch64 ]; then sudo update-binfmts --enable qemu-aarch64 || true; fi
+          compgen -G '/proc/sys/fs/binfmt_misc/*aarch64*' > /dev/null || { echo "::error::no qemu-aarch64 binfmt handler: the arm64 root filesystem cannot be built"; exit 1; }
+
+      - name: cache downloads and toolchains (keyed on the board's configuration)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ matrix.dir }}/build/downloads
+            ${{ matrix.dir }}/build/toolchain
+          key: dl-${{ matrix.board }}-${{ hashFiles(format('{0}/config/**', matrix.dir)) }}
+          restore-keys: |
+            dl-${{ matrix.board }}-
+
+      - name: cache ccache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .ccache
+          key: ccache-${{ matrix.board }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ matrix.board }}-
+
+      - name: build
+        working-directory: ${{ matrix.dir }}
+        env:
+          BUILD_COMMANDS: ${{ matrix.build }}
+        run: |
+          set -euo pipefail
+          while IFS= read -r cmd; do
+            [ -n "$cmd" ] || continue
+            echo "::group::$cmd"
+            bash -c "$cmd"
+            echo "::endgroup::"
+          done <<< "$BUILD_COMMANDS"
+          ccache -s || true
+
+      - name: make release assets
+        env:
+          BOARD: ${{ matrix.board }}
+          VARIANT: ${{ matrix.variant }}
+          NAME: ${{ matrix.name }}
+        run: tools/release/make-assets.sh "$BOARD" "$VARIANT" "out/$NAME"
+
+      - name: summary
+        env:
+          NAME: ${{ matrix.name }}
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, os
+          m = json.load(open("out/%s/manifest.json" % os.environ["NAME"]))
+          v = m["verified_on_hardware"]
+          print("### %s" % m["name"]); print()
+          print("%s, tag `%s`, commit `%s`, built %s" % (m["title"], m["tag"], m["git_commit"][:12], m["build_date"])); print()
+          print("Verified on hardware: **%s** %s" % ("yes" if v["verified"] else "NO", v["text"])); print()
+          print("| File | Size | sha256 |"); print("| --- | ---: | --- |")
+          for f in m["files"]:
+              print("| `%s` | %.1f MB | `%s` |" % (f["name"], f["size"] / 1e6, f["sha256"][:16]))
+          print(); print("Kept as a workflow artifact for 14 days. Publish a release (tag `vX.Y.Z`) for a durable copy.")
+          PY
+
+      - name: upload (kept 14 days)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image-${{ matrix.name }}
+          path: out/${{ matrix.name }}
+          retention-days: 14
+          compression-level: 0
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  repro:
+    name: reproducibility · ${{ matrix.board }}
+    needs: plan
+    if: needs.plan.outputs.has_repro == 'true'
+    runs-on: ${{ vars.IMAGES_RUNNER || 'ubuntu-24.04' }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.repro_matrix) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: build date from the commit (SOURCE_DATE_EPOCH)
+        run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct HEAD)" >> "$GITHUB_ENV"
+
+      - name: host packages
+        env:
+          BOARD_DIR: ${{ matrix.dir }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ccache xz-utils
+          (cd "$BOARD_DIR" && ./build.sh --yes deps --install)
+
+      - name: cache downloads and toolchains
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ matrix.dir }}/build/downloads
+            ${{ matrix.dir }}/build/toolchain
+          key: dl-${{ matrix.board }}-${{ hashFiles(format('{0}/config/**', matrix.dir)) }}
+          restore-keys: |
+            dl-${{ matrix.board }}-
+
+      - name: build twice, compare
+        env:
+          BOARD_DIR: ${{ matrix.dir }}
+          COMMANDS: ${{ matrix.commands }}
+          OUTPUTS: ${{ matrix.outputs }}
+          BOARD: ${{ matrix.board }}
+        run: |
+          set -uo pipefail
+          {
+            echo "### Reproducibility check: $BOARD"; echo
+            echo "The same commit, built twice in two different directories with the same SOURCE_DATE_EPOCH (\`$SOURCE_DATE_EPOCH\`)."
+            echo "Commands: \`$(echo "$COMMANDS" | tr '\n' ';')\`"; echo
+          } >> "$GITHUB_STEP_SUMMARY"
+          tools/release/repro-check.sh "$BOARD_DIR" "$COMMANDS" "$OUTPUTS" > "$RUNNER_TEMP/repro.md"
+          rc=$?
+          cat "$RUNNER_TEMP/repro.md" >> "$GITHUB_STEP_SUMMARY"
+          case $rc in
+            0) echo "**Result: bit-for-bit identical.**" >> "$GITHUB_STEP_SUMMARY" ;;
+            3) echo "**Result: the builds DIFFER.** See docs/reproducible-builds.md for the known causes." >> "$GITHUB_STEP_SUMMARY"
+               echo "::warning::$BOARD is not bit-for-bit reproducible yet" ;;
+            *) echo "**Result: a build failed.**" >> "$GITHUB_STEP_SUMMARY"; exit 1 ;;
+          esac
+          exit 0
+
+  # ---------------------------------------------------------------------------
+  release:
+    name: release · ${{ needs.plan.outputs.tag }}
+    needs: [plan, build]
+    if: needs.plan.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: download every image artifact (one sub-directory each)
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: image-*
+          path: artifacts
+
+      - name: verify the downloaded artifacts
+        run: python3 tools/release/verify-assets.py artifacts
+
+      - name: combine into a verified release and a preview release
+        env:
+          TAG: ${{ needs.plan.outputs.tag }}
+        run: python3 tools/release/combine.py artifacts release --tag "$TAG" --repo "$GITHUB_REPOSITORY"
+
+      - name: verify the release directories
+        run: |
+          python3 tools/release/verify-assets.py release
+          for d in release/*/; do (cd "$d" && sha256sum -c SHA256SUMS); done
+
+      - name: create or update the GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          publish() {  # <directory>: one release from release/<stream>, safe to run again
+            local dir=$1 tag pre
+            tag=$(jq -r '.tag' "$dir/manifest.json"); pre=$(jq -r '.prerelease' "$dir/manifest.json")
+            local assets=()
+            while IFS= read -r f; do assets+=("$f"); done < <(find "$dir" -maxdepth 1 -type f ! -name RELEASE_NOTES.md | sort)
+            if gh release view "$tag" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+              echo "release $tag exists: replacing its assets and notes"
+              gh release upload "$tag" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+              gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --title "Boot images $tag" \
+                --notes-file "$dir/RELEASE_NOTES.md" --prerelease="$pre"
+            else
+              local flags=(--title "Boot images $tag" --notes-file "$dir/RELEASE_NOTES.md")
+              # the pushed tag exists; the -preview tag and tags of manual runs are created on this commit
+              if [ "$EVENT" = push ] && [ "$pre" != true ]; then flags+=(--verify-tag); else flags+=(--target "$GITHUB_SHA"); fi
+              if [ "$pre" = true ]; then flags+=(--prerelease --latest=false); else flags+=(--latest); fi
+              gh release create "$tag" "${assets[@]}" --repo "$GITHUB_REPOSITORY" "${flags[@]}"
+            fi
+            {
+              echo "### Release $tag"; echo
+              echo "https://github.com/$GITHUB_REPOSITORY/releases/tag/$tag"; echo
+              if [ "$pre" = true ]; then
+                echo "**Preview (pre-release)**: images not verified on hardware. The \`releases/latest/download/...\` links never point here."
+              else
+                echo "**Verified release**: \`releases/latest/download/<file>\` points here."
+              fi
+              echo
+            } >> "$GITHUB_STEP_SUMMARY"
+          }
+          # verified first, so the verified release is the newer one when both are created
+          if [ -d release/preview ]; then publish release/preview; fi
+          if [ -d release/stable ]; then publish release/stable; fi

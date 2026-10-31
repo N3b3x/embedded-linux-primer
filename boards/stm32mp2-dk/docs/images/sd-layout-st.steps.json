@@ -1,0 +1,61 @@
+{
+  "title": "The SD card of STACK=st",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "ST's own layout, eight partitions",
+      "body": "This is the card `./build.sh -s st image` writes. The strip shows the first 18 MiB to scale; the six cards explain the partitions; the bottom shows how BL2 picks its firmware and what U-Boot reads.\n\nThe partition names and type GUIDs are the ones ST's own image uses, so the boot ROM and BL2 see what they would see on a card from ST."
+    },
+    {
+      "anchor": "rect:40,148,1320,66",
+      "title": "Everything before 10 MiB is firmware",
+      "body": "From the left: BL2 twice, the metadata twice, the FIP twice and the U-Boot environment, all back to back starting at 17 KiB. Then empty space, and the root filesystem from 16 MiB to the end of the card.\n\nThe two FIP partitions are 4 MiB each and dominate the picture."
+    },
+    {
+      "anchor": "1-2  fsbla1, fsbla2",
+      "title": "BL2 twice, starting at sector 34",
+      "body": "`fsbla1` is the first partition after the GPT, at sector 34 (17 KiB), as in ST's own image. The boot ROM looks for it by name and loads BL2 into on-chip memory; `fsbla2` is the fallback copy.\n\nIf a board stays completely silent at power-on, this is the first thing the ROM touches."
+    },
+    {
+      "anchor": "3-4  metadata1, metadata2",
+      "title": "The metadata says which FIP is active",
+      "body": "Each partition holds the same 120-byte record, written by U-Boot's `mkfwumdata`: one image per bank, two banks, bank 0 active. The image of bank 0 is named by the PARTUUID of `fip-a`.\n\nBL2 reads `metadata1` and falls back to `metadata2`. It is part of ST's firmware-update feature, which is why this layout has it."
+    },
+    {
+      "anchor": [
+        "5  fip-a",
+        "6  fip-b"
+      ],
+      "title": "Two copies of the FIP",
+      "body": "The FIP is the packed firmware file: BL31, OP-TEE, U-Boot, the DDR training firmware and the device trees. Both partitions get the same file and carry fixed PARTUUIDs that the metadata names.\n\nOnly bank 0 is read. `fip-b` is the spare that a firmware update would switch to."
+    },
+    {
+      "anchor": "7  u-boot-env",
+      "title": "U-Boot's saved variables, wiped on every flash",
+      "body": "U-Boot finds this partition by name and keeps its environment at the end of it, two copies. The image leaves it empty, but a flash tool skips blocks of zeros, so `./build.sh flash` erases it explicitly.\n\nOtherwise a card that held ST's image before would bring ST's old variables into the first boot."
+    },
+    {
+      "anchor": "8  rootfs",
+      "title": "The root filesystem is the same as in the mainline stack",
+      "body": "An ext4 partition from 16 MiB with the GPT 'bootable' flag, which is how U-Boot knows where to look, and a fixed PARTUUID that the kernel command line names.\n\nIt holds the distribution, the kernel, the device tree and `/boot/extlinux/extlinux.conf`."
+    },
+    {
+      "anchor": "BL2 with PSA_FWU_SUPPORT=1",
+      "up": 1,
+      "title": "How BL2 finds the FIP",
+      "body": "With firmware-update support BL2 does not search for a partition of the FIP type. It reads the metadata, takes the active bank, and loads the partition whose PARTUUID the metadata names.\n\nWithout the feature (the mainline stack) it looks for the FIP type GUID, so the extra partitions are not needed."
+    },
+    {
+      "anchor": "/boot/extlinux/extlinux.conf",
+      "up": 1,
+      "title": "extlinux.conf for ST's kernel",
+      "body": "`FDT` names ST's `ostl` tree. `APPEND` carries the root by PARTUUID, `earlycon` (kernel messages before the real serial driver), `console=ttySTM0,115200`, and `modprobe.blacklist=etnaviv`.\n\nThere is no `rootflags=`: ST's 6.6 kernel passes it to ext4 as a filesystem option and rejects `noatime`."
+    },
+    {
+      "anchor": "What this layout is for",
+      "up": 1,
+      "title": "Takeaway: ST's card, built from source",
+      "body": "The layout is ST's, the firmware is ST's, the kernel and the device trees are ST's: only the root filesystem is ours. If this card boots and the mainline card does not, the board is fine."
+    }
+  ]
+}

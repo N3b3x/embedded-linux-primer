@@ -1,0 +1,12 @@
+Copyright (c) 2026 Nebiyu Tadesse. All rights reserved.
+
+This repository is published so that it can be read and learned from. Unless a file says otherwise, no
+licence is granted to copy, modify, distribute or publish any part of this repository, or of the
+documentation site built from it, beyond what the GitHub Terms of Service allow (viewing and forking on
+GitHub), without prior written permission.
+
+Third-party software, firmware and documentation that the scripts in this repository download,
+build or refer to (for example the Linux kernel, U-Boot, Trusted Firmware-A, OP-TEE, Debian,
+Alpine Linux, NXP firmware-imx, NVIDIA Jetson Linux) is not part of this repository and stays
+under its own licences and terms; the scripts that fetch it say where those terms are. Assets
+bundled in this repository that come from third parties are listed in THIRD_PARTY_NOTICES.md.

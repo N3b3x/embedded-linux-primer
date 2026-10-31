@@ -1,0 +1,65 @@
+{
+  "title": "What happens on an smc",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "smc is a deliberate trap into the secure monitor",
+      "body": "Four lanes, left to right: the application and the Linux kernel in the normal world, then BL31 and optional OP-TEE in the secure world. Time runs downward.\n\nBL31 reads the function ID in `x0` and either answers itself (PSCI, SiP) or forwards the call to OP-TEE. Case A happens on every boot of this board; case B only exists if OP-TEE is built in."
+    },
+    {
+      "anchor": "smp_init(): bring up CPU 1",
+      "up": 1,
+      "title": "A: the kernel needs its other three cores",
+      "body": "At boot only one core runs. Linux's `smp_init()` has to start the others, but powering a core on is a privileged operation it cannot do itself, so it asks the firmware through PSCI (Arm's standard power-state interface)."
+    },
+    {
+      "anchor": [
+        "x0 = 0xC400_0003",
+        "x1 = 0x1",
+        "x2 = entry",
+        "x3 = context"
+      ],
+      "title": "A: the arguments go in registers",
+      "body": "`x0 = 0xC400_0003` is the function ID for 64-bit `PSCI CPU_ON`. `x1` is the target core, `x2` the address where it should start running and `x3` a context value passed to it.\n\nThese are the same registers any function call would use, which is why `smc #0` can pass them with no memory setup."
+    },
+    {
+      "anchor": [
+        "smc #0",
+        "CPU traps to EL3"
+      ],
+      "up": 0,
+      "title": "A: the CPU traps to EL3",
+      "body": "The `smc #0` instruction raises an exception: the CPU saves `ELR_EL3` and `SPSR_EL3` and jumps to the vector at `VBAR_EL3`, which BL31 owns. Linux cannot choose where it lands, only that it lands in BL31."
+    },
+    {
+      "anchor": "PSCI handler",
+      "up": 1,
+      "title": "A: BL31 powers up core 1 and returns",
+      "body": "The PSCI handler powers up core 1 through the GPC (the chip's general power controller), then `eret` returns to the kernel with `x0 = 0` meaning SUCCESS. `dmesg` shows `CPU1: Booted secondary processor`.\n\nWithout this handler, Linux would run on one core of four."
+    },
+    {
+      "anchor": "B · ONLY WITH OP-TEE BUILT IN: an app uses a key it never sees",
+      "up": 1,
+      "title": "B: an app asks the secure world to use a key",
+      "body": "Here an application calls `ioctl(/dev/tee0)`, an `svc` into the kernel's OP-TEE driver. The driver sets `x0 = 0x3200_0004` (`CALL_WITH_ARG`) and points `x1`, `x2` at a buffer in shared memory, then executes `smc #0`.\n\nThe app never sees the key it is asking about."
+    },
+    {
+      "anchor": "opteed dispatcher",
+      "up": 1,
+      "title": "B: BL31 saves Linux and enters OP-TEE",
+      "body": "The `opteed` dispatcher inside BL31 saves the Linux registers and clears `SCR_EL3.NS` to 0, selecting the secure world. An `eret` then drops to S-EL1 where OP-TEE runs.\n\nThis is the world switch only EL3 can perform."
+    },
+    {
+      "anchor": "Trusted Application",
+      "up": 1,
+      "title": "B: the key is used where Linux cannot look",
+      "body": "The trusted application uses the key in secure-only RAM, then ends with `smc` to say it is done. The result returns through BL31, which sets `NS = 1` again, puts the answer in `x0`-`x3` and returns to the kernel, and finally `ioctl` returns to the app."
+    },
+    {
+      "anchor": "Arrows:",
+      "title": "Three arrows, and the other half of the picture",
+      "body": "`svc` is a system call into the kernel, `smc` goes into EL3, and `eret` goes back down to the caller's level.\n\nThis diagram shows how a call enters the secure world. The companion diagram **How TrustZone is enforced, and what it protects in this build** shows how the hardware decides which memory the secure world actually protects.",
+      "pad": 40
+    }
+  ]
+}

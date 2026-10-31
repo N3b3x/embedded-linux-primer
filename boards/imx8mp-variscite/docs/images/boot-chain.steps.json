@@ -1,0 +1,60 @@
+{
+  "title": "Power-on to login on the i.MX 8M Plus",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "Six stages, each loading the next",
+      "body": "Read the chain left to right and top to bottom: every card is one stage of the boot, with where it runs, what it does and which file this repository builds for it.\n\nEach stage either finishes and exits, or stays in memory to serve the next one. The coloured bands mark the **secure world** (privileged firmware) and the **normal world** (U-Boot, Linux)."
+    },
+    {
+      "anchor": "Boot ROM",
+      "title": "1 · The Boot ROM is fixed in silicon",
+      "body": "Code burned into the chip that runs first, at the highest privilege level (EL3). It reads the boot-mode switch, loads `imx-boot` from the card at 32 KiB, checks its header and starts the SPL.\n\nThere is nothing to build here, and it decides where your first loader must sit on the storage.",
+      "up": 1
+    },
+    {
+      "anchor": "U-Boot SPL",
+      "title": "2 · The SPL brings DDR memory to life",
+      "body": "The SPL (Secondary Program Loader) is a small first part of U-Boot that runs from on-chip RAM at `0x0092_0000`. It reads the SoM EEPROM, trains the LPDDR4 memory with NXP's training firmware, and loads the FIT image holding BL31 and U-Boot.\n\nWithout working DRAM nothing later can run, so a fault here usually means a silent board.",
+      "up": 1
+    },
+    {
+      "anchor": "TF-A · BL31",
+      "title": "3 · BL31 is the secure monitor that never leaves",
+      "body": "TF-A (Trusted Firmware-A) BL31 sits at `0x0097_0000` in on-chip RAM at EL3. It handles every SMC (a call from the normal world into secure firmware), programs the TZASC, CSU and RDC protection units, and implements PSCI for CPU on/off and reset.\n\nLinux cannot start its other CPUs without it.",
+      "up": 1
+    },
+    {
+      "anchor": "OP-TEE · BL32",
+      "title": "4 · OP-TEE is optional and not in this build",
+      "body": "OP-TEE is a trusted OS at S-EL1 that would run Trusted Applications for keys, crypto and secure storage from DDR at `0x5600_0000`. The dashed card means it is not part of the default build yet.\n\nIf it were added, BL31 would enter it before handing over to U-Boot.",
+      "up": 1
+    },
+    {
+      "anchor": "U-Boot · BL33",
+      "title": "5 · U-Boot proper picks the kernel and device tree",
+      "body": "The full U-Boot runs at EL2 in the normal world from `0x4020_0000`. It chooses the right DTB (device tree, the hardware description) for the detected module, loads `/boot/Image.gz`, sets the kernel arguments and calls `booti`.\n\nBL31 enters it with an ERET, the instruction that drops privilege from EL3 to EL2.",
+      "up": 1
+    },
+    {
+      "anchor": "Linux 6.18",
+      "title": "6 · Linux takes over and starts the other CPUs",
+      "body": "The kernel runs at EL1 with applications at EL0, from `0x4060_0000`. It asks BL31 through PSCI to start three more CPUs, mounts `mmcblk1p1` as the root filesystem and runs `/sbin/init`, which ends at the login prompt.",
+      "up": 1
+    },
+    {
+      "anchor": "STILL IN MEMORY WHILE LINUX RUNS",
+      "title": "What survives after boot",
+      "body": "The Boot ROM and SPL are finished and their on-chip RAM is reused. U-Boot is gone after `booti`.\n\nOnly BL31 stays at EL3 for good, serving PSCI and the i.MX SiP calls (DDR frequency, CPU frequency, power domains); OP-TEE would stay too, reached through BL31.",
+      "up": 1
+    },
+    {
+      "anchor": [
+        "ERET → U-Boot at EL2",
+        "Dashed = optional stage, not part of the default build. Red arrows = transitions owned by the secure monitor."
+      ],
+      "title": "Takeaway: the secure monitor owns the handoffs",
+      "body": "Red arrows are transitions that BL31 performs, so the secure monitor is involved from the first handoff to the last power-off. Each stage exists because the one before it cannot do the job: ROM cannot train DRAM, the SPL cannot fit a full bootloader, and U-Boot cannot run Linux's drivers."
+    }
+  ]
+}

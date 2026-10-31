@@ -1,0 +1,52 @@
+{
+  "title": "Which medium does the Boot ROM read?",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "One ROM, three places to look",
+      "body": "Every i.MX 8M Plus starts in a Boot ROM that is burned into the chip. It reads the boot switch of the carrier, tries **one** medium, and hands over to the SPL it finds there.\n\nRead the diagram left to right: the ROM, the switch position, the medium, and where in it the boot image must be."
+    },
+    {
+      "anchor": "Boot ROM",
+      "up": 1,
+      "title": "The ROM cannot be broken",
+      "body": "The ROM is mask ROM: no flash write can damage it. That is why a board with an empty or corrupt eMMC is never bricked. It can always be revived over USB."
+    },
+    {
+      "anchor": "SD",
+      "up": 1,
+      "title": "Switch on SD: 32 KiB of the card",
+      "body": "The ROM reads `imx-boot.bin` raw at 32 KiB, with no filesystem. This is the layout `./build.sh flash` writes, and the real boot log shows `image offset 0x8000`."
+    },
+    {
+      "anchor": "eMMC",
+      "up": 1,
+      "title": "Switch on eMMC: the eMMC decides again",
+      "body": "The eMMC itself holds a setting, `BOOT_PARTITION_ENABLE` in its EXT_CSD register. It tells the ROM which of the eMMC's areas to read."
+    },
+    {
+      "anchor": "boot0 / boot1 at offset 0",
+      "up": 1,
+      "title": "Boot partitions: offset 0",
+      "body": "With `BOOT_PARTITION_ENABLE` = 1 or 2 the ROM reads boot0 or boot1 and expects the container at the **very first byte**. The 32 KiB offset does not apply there. `./build.sh uuu emmc` sets it up this way."
+    },
+    {
+      "anchor": "user area at 32 KiB",
+      "up": 1,
+      "title": "Boot configuration 0: the user area",
+      "body": "If no boot partition is enabled, the ROM reads the user area at 32 KiB, like on SD. Variscite's own installer and `dd if=sdcard.img of=/dev/mmcblk2` use this. It stops working the moment a boot partition is enabled, because the old copy is then ignored."
+    },
+    {
+      "anchor": "serial download",
+      "up": 1,
+      "title": "Serial download: the PC is the boot medium",
+      "body": "With this position, or when the chosen medium has nothing valid (an SD switch with an empty slot), the ROM waits on the USB OTG port as device `1fc9:0146`. `uuu` sends it the boot image. Nothing is read from storage."
+    },
+    {
+      "anchor": "After the ROM it is the same software everywhere: SPL → TF-A BL31 → U-Boot.",
+      "up": 1,
+      "title": "After the ROM nothing differs",
+      "body": "The same `imx-boot.bin` runs in every case, only its offset differs. U-Boot learns the boot device from the ROM and picks `root=/dev/mmcblk1p1`, `/dev/mmcblk2p1`, or starts fastboot for USB."
+    }
+  ]
+}

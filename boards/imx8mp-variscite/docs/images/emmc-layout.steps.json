@@ -1,0 +1,53 @@
+{
+  "title": "What is where in the on-module eMMC",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "An eMMC is three storage areas in one chip",
+      "body": "The SD card on top is the reference. Below it the eMMC has two boot partitions, a user area and a small replay-protected area. Each has its own name in Linux and in U-Boot."
+    },
+    {
+      "anchor": "SD card",
+      "up": 1,
+      "title": "The SD layout, for comparison",
+      "body": "`imx-boot.bin` at 32 KiB, a saved U-Boot environment at 7 MiB and the root partition from 8 MiB. The same bytes go into the eMMC user area when you flash the image there."
+    },
+    {
+      "anchor": "boot0",
+      "up": 1,
+      "title": "boot0: where the ROM looks when told to",
+      "body": "A 4 MiB hardware partition, `/dev/mmcblk2boot0`, selected in U-Boot with `mmc dev 2 1`. `imx-boot.bin` goes in at byte 0, not at 32 KiB. Linux keeps boot partitions read-only unless you write `0` to `/sys/block/mmcblk2boot0/force_ro`."
+    },
+    {
+      "anchor": "boot1",
+      "up": 1,
+      "title": "boot1: the second copy",
+      "body": "`./build.sh uuu emmc` writes the same container here. The ROM only boots the partition named in `PARTITION_CONFIG`, so boot1 is a spare that a later update can switch to."
+    },
+    {
+      "anchor": "user area",
+      "up": 1,
+      "title": "The user area: partitions and the OS",
+      "body": "Here sit the MBR, the root filesystem as `/dev/mmcblk2p1`, and U-Boot's saved environment at 7 MiB. The partition is only as large as the image, so grow it once on the board."
+    },
+    {
+      "anchor": "copy, unused while boot0 is on",
+      "up": 1,
+      "title": "The 32 KiB copy is a leftover",
+      "body": "It comes with the SD image. While boot0 is enabled the ROM ignores it. It becomes the boot image again if you set `BOOT_PARTITION_ENABLE` back to 0."
+    },
+    {
+      "anchor": "env",
+      "nth": 1,
+      "up": 1,
+      "title": "Why the environment is erased",
+      "body": "A saved environment (`saveenv`) lives at 7 MiB of the user area and survives a block-mapped re-flash. A full flash zeroes it, so no old `fdt_file` or `bootcmd` is carried over."
+    },
+    {
+      "anchor": "Which area does the ROM read?  EXT_CSD[179] PARTITION_CONFIG, written by  mmc partconf 2 1 1 0",
+      "up": 1,
+      "title": "One register decides",
+      "body": "`BOOT_PARTITION_ENABLE` picks boot0, boot1 or the user area. `mmc partconf 2 1 1 0` means: eMMC device 2, boot ack on, boot0, access to the user area. Read it back before you flip the switch."
+    }
+  ]
+}

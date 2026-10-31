@@ -1,0 +1,116 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * Digilent Eclypse Z7 (XC7Z020-1CLG484), processing system only.
+ *
+ * ONE file for both software projects: build.sh copies it into U-Boot (arch/arm/dts/) and into
+ * the kernel (arch/arm/boot/dts/xilinx/). Both trees have a zynq-7000.dtsi with the same layout,
+ * which is why the same text compiles in each.
+ *
+ * What the board wires to the PS, from its reference manual and the Vivado board preset:
+ *   UART0   MIO 14/15   -> FT2232HQ USB-UART (J6), 115200 8N1
+ *   SD0     MIO 40-45   -> microSD slot J4, card detect MIO 47, no write-protect pin
+ *   GEM0    MIO 16-27   -> RTL8211E-VL PHY, RGMII, MDIO address 1, reset on MIO 9
+ *   USB0    MIO 28-39   -> ULPI PHY, reset on MIO 46, micro-AB connector
+ *   I2C1    MIO 12/13   -> platform MCU (SYZYGY power / enumeration)
+ *   QSPI    MIO 1-6, 8  -> 16 MB flash (holds the factory MAC address in its OTP area)
+ *   DDR3L   1 GiB, 32 bit, PS_CLK 33.3333 MHz
+ *
+ * The MIO pin MUXING is not in this file: the Zynq has no pinctrl driver for it in this setup. It is
+ * written by the PS7 initialisation that the U-Boot SPL runs (docs/03-uboot-spl.md).
+ * Nothing of the programmable logic (PL) is described: the fabric stays unconfigured.
+ *
+ * "bootph-all" marks the nodes U-Boot's SPL also needs (console and SD card); Linux ignores it.
+ */
+/dts-v1/;
+#include "zynq-7000.dtsi"
+#include <dt-bindings/gpio/gpio.h>
+
+/ {
+	model = "Digilent Eclypse Z7";
+	compatible = "digilent,zynq-eclypse-z7", "xlnx,zynq-7000";
+
+	aliases {
+		ethernet0 = &gem0;
+		serial0 = &uart0;
+		spi0 = &qspi;
+		mmc0 = &sdhci0;
+		i2c0 = &i2c1;
+	};
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0x0 0x40000000>;
+	};
+
+	chosen {
+		bootargs = "";
+		stdout-path = "serial0:115200n8";
+	};
+
+	usb_phy0: phy0 {
+		#phy-cells = <0>;
+		compatible = "usb-nop-xceiv";
+		reset-gpios = <&gpio0 46 GPIO_ACTIVE_LOW>;
+	};
+};
+
+&clkc {
+	/* The board feeds 33.3333 MHz to PS_CLK. */
+	ps-clk-frequency = <33333333>;
+};
+
+&uart0 {
+	bootph-all;
+	status = "okay";
+};
+
+&sdhci0 {
+	bootph-all;
+	status = "okay";
+	/* There is no write-protect switch on a microSD slot. */
+	disable-wp;
+};
+
+&gem0 {
+	status = "okay";
+	phy-mode = "rgmii-id";
+	phy-handle = <&ethernet_phy>;
+
+	ethernet_phy: ethernet-phy@1 {
+		reg = <1>;
+		/* Realtek RTL8211E-VL; its RESET# pin is MIO 9. */
+		reset-gpios = <&gpio0 9 GPIO_ACTIVE_LOW>;
+		reset-assert-us = <10000>;
+		reset-deassert-us = <30000>;
+	};
+};
+
+&gpio0 {
+	status = "okay";
+};
+
+&i2c1 {
+	status = "okay";
+	clock-frequency = <400000>;
+};
+
+&qspi {
+	bootph-all;
+	status = "okay";
+	num-cs = <1>;
+	is-dual = <0>;
+
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <50000000>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+	};
+};
+
+&usb0 {
+	status = "okay";
+	dr_mode = "host";
+	usb-phy = <&usb_phy0>;
+};

@@ -1,0 +1,58 @@
+{
+  "title": "What ./build.sh all does",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "Sources in, one SD card image out",
+      "body": "Read left to right: four pinned source trees plus a root filesystem on the left, the build step for each in the middle, the files each step leaves in `build/deploy/`, and finally the image.\n\nEvery column is a step you can also run alone, and `./build.sh --dry-run all` prints the whole recipe with the reasons."
+    },
+    {
+      "anchor": "OP-TEE 4.11.0",
+      "title": "Step 1: OP-TEE",
+      "body": "`./build.sh firmware optee` builds the trusted OS with `PLATFORM=stm32mp1` and the board tree `stm32mp157c-dk2-scmi.dts`. On this 32-bit chip OP-TEE is also the secure monitor and the SCMI server, and it comes out as three files because paging is on.",
+      "up": 1
+    },
+    {
+      "anchor": "U-Boot v2026.07",
+      "title": "Step 2: U-Boot",
+      "body": "`./build.sh firmware uboot` builds the bootloader from `stm32mp15_defconfig` for the device tree `st/stm32mp157c-dk2-scmi`. It produces the program and its own device tree, which BL2 needs separately.",
+      "up": 1
+    },
+    {
+      "anchor": "TF-A v2.15.0",
+      "title": "Step 3: BL2, the only TF-A binary",
+      "body": "`./build.sh firmware tfa` builds BL2 with an STM32 header the Boot ROM will accept. On this chip there is no BL31, so BL2 is all that is built from TF-A at this point.",
+      "up": 1
+    },
+    {
+      "anchor": "TF-A tools/fiptool",
+      "title": "Step 4: the FIP",
+      "body": "`./build.sh firmware fip` runs TF-A's `fiptool` to pack OP-TEE's three files, U-Boot and the two device trees into `fip.bin`, a container BL2 can read by UUID.",
+      "up": 1
+    },
+    {
+      "anchor": "Linux 6.18.58",
+      "title": "Step 5: the kernel",
+      "body": "`./build.sh kernel` unpacks the kernel.org tarball, configures it from `multi_v7_defconfig` plus the fragments in `config/kernel/`, and builds `zImage`, the device tree and the modules. It is the longest step.",
+      "up": 1
+    },
+    {
+      "anchor": "Debian trixie / Alpine 3.24",
+      "title": "Step 6: the root filesystem",
+      "body": "`./build.sh rootfs` makes `rootfs.tar` from Debian (mmdebstrap, `armhf`) or Alpine (`armv7`). The packages are 32-bit ARM, so on most build PCs an emulator (qemu) runs their install scripts.",
+      "up": 1
+    },
+    {
+      "anchor": "./build.sh image",
+      "title": "The image step stitches it together without root",
+      "body": "`fakeroot` and `mke2fs -d` build the ext4 root filesystem from the rootfs and the kernel, `sfdisk` writes the GPT, and `dd` places BL2 twice, the FIP and the filesystem at their partitions.\n\nNothing here needs root, so you can run it as your normal user.",
+      "up": 1
+    },
+    {
+      "anchor": "sdcard.img  (+ .bmap)",
+      "title": "The result: one file to write to a card",
+      "body": "`sdcard.img` plus a block map that lets `bmaptool` skip the empty parts. `./build.sh flash -d /dev/sdX` writes it, after refusing system disks and asking you to confirm.",
+      "up": 1
+    }
+  ]
+}

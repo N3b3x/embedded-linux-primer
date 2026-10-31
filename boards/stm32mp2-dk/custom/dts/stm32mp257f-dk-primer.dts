@@ -1,0 +1,42 @@
+// SPDX-License-Identifier: (GPL-2.0-only OR BSD-3-Clause)
+/*
+ * The DK's device tree plus one workaround, for the all-upstream firmware this
+ * repository builds (see docs/09-troubleshooting.md and docs/11-secure-world-and-scmi.md).
+ *
+ * Upstream arch/arm64/boot/dts/st/stm32mp257f-dk.dts takes the SD card's two
+ * supplies from SCMI *voltage domains* (&scmi_regu, SCMI protocol 0x17). OP-TEE's
+ * SCMI server for the STM32MP2 serves only the clock (0x14) and reset (0x16)
+ * protocols (core/arch/arm/dts/stm32mp25-st-scmi-cfg.dtsi in OP-TEE 4.11.0), so
+ * Linux would wait forever for a regulator that never appears, and the SD card
+ * (our root filesystem) would never be probed.
+ *
+ * Here the two supplies are plain fixed regulators. They only DESCRIBE a supply
+ * that is already on (the card was read by BL2 and U-Boot); Linux does not switch
+ * it. With firmware that does implement the voltage-domain protocol (ST's own
+ * OP-TEE builds), boot the stock stm32mp257f-dk.dtb instead.
+ */
+
+#include "stm32mp257f-dk.dts"
+
+/ {
+	vdd_sdcard_fixed: regulator-vdd-sdcard {
+		compatible = "regulator-fixed";
+		regulator-name = "vdd_sdcard";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-always-on;
+	};
+
+	vddio1_fixed: regulator-vddio1 {
+		compatible = "regulator-fixed";
+		regulator-name = "vddio1";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-always-on;
+	};
+};
+
+&sdmmc1 {
+	vmmc-supply = <&vdd_sdcard_fixed>;
+	vqmmc-supply = <&vddio1_fixed>;
+};

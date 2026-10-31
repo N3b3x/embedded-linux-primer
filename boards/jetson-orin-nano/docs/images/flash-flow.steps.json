@@ -1,0 +1,25 @@
+{
+  "title": "How the board is flashed",
+  "steps": [
+    {"anchor": null, "title": "The PC boots a small Linux on the Jetson, and that Linux does the writing",
+     "body": "Time runs down the page. The left dashed line is the host PC, the right one is the Jetson, and each arrow is a message in one of seven numbered steps. Notes beside the lines say what each side is doing.\n\nThe PC never writes the storage directly. It loads a small Linux into the board's RAM, and that Linux pulls the images and writes them itself."},
+    {"anchor": ["Host PC (x86-64 Ubuntu)", "Jetson Orin Nano Dev Kit", "one USB-C cable: data only, and it also carries the Ethernet link (usb0)"], "title": "One USB-C cable is the only link",
+     "body": "The host runs `sudo l4t_initrd_flash.sh`. The board sits in recovery mode, a state where its BootROM waits for a PC on USB.\n\nThe cable carries data only, no power, and later it also carries an Ethernet link called `usb0`. A bad cable breaks both the first and the later steps."},
+    {"anchor": ["Force Recovery Mode: BootROM waits for USB", "lsusb -d 0955:", "jumper REC–GND, power on"], "exact": true, "pad": 10, "title": "Step 1: a jumper makes the BootROM wait for USB",
+     "body": "With a jumper between REC and GND at power-on, only the BootROM has run: it waits on USB instead of loading firmware. On the PC, `lsusb -d 0955:` shows `0955:7523 NVidia Corp.`\n\nIf that device does not appear, nothing else can work, so check the jumper, cable and port first."},
+    {"anchor": ["RCM boot: bootloader + kernel + initrd go into RAM", "flash.sh --no-flash --rcm-boot", "MB2 on the CPU complex loads"], "exact": true, "pad": 10, "title": "Step 2: the host pushes a bootloader, kernel and initrd into RAM",
+     "body": "The tool generates and runs `flash.sh --no-flash --rcm-boot`. RCM is the BootROM's recovery protocol for loading code over USB.\n\nMB2 on the CPU complex loads the three pieces into SDRAM and starts them, so the board is now running a Linux that lives only in RAM."},
+    {"anchor": ["a USB Ethernet link appears: usb0 (IPv6)", "host: fc00:1:1:0::1/64", "initrd Linux answers at"], "exact": true, "pad": 10, "title": "Step 3: the cable becomes a network",
+     "body": "The RAM-booted Linux exposes the USB cable as `usb0`. The host side is `fc00:1:1:0::1/64`, set up with udev rules installed for the run, and the board answers at `fe80::1` and `fc00:1:1:0::2`.\n\nThe link is IPv6, so IPv6 turned off, a firewall, a VPN or a poor cable will stop the flash here."},
+    {"anchor": ["SSH: start the flashing script on the board", "sshpass → root on the initrd", "l4t_flash_from_kernel.sh"], "exact": true, "pad": 10, "title": "Step 4: the host logs in over SSH and starts the script",
+     "body": "Using `sshpass`, the host connects as root to the initrd, an account that exists only inside the RAM-booted initrd. It starts `l4t_flash_from_kernel.sh` on the board.\n\nThat script reads `initrd_flash.cfg` to learn what to write and where."},
+    {"anchor": ["NFS: the board mounts the host's flash package", "exports tools/kernel_flash/", "mount of the export;"], "exact": true, "pad": 10, "title": "Step 5: the board mounts the host's images over NFS",
+     "body": "The host exports `tools/kernel_flash/` images over NFS (a network file system) and removes the export afterwards. The board mounts it and reads the images from it.\n\nIf a firewall blocks NFS, the board cannot read the package and the flash stops here."},
+    {"anchor": "the board writes its own storage", "up": 1, "title": "Step 6: the board writes both storage devices",
+     "body": "The Linux on the Jetson writes the QSPI-NOR boot firmware (chains A and B), and on the SD card, NVMe or USB drive it writes the GPT, kernel, kernel-dtb, ESP and APP (the root filesystem).\n\nThe host just waits, and the log is saved in `Linux_for_Tegra/initrdlog/`."},
+    {"anchor": ["\"Success\": the board reboots from the new media", "cleanup: udev rules, NFS export", "MB1 → … → UEFI → L4TLauncher"], "exact": true, "pad": 10, "title": "Step 7: success, cleanup and a reboot into the new system",
+     "body": "When the board reports success, the host cleans up its udev rules and NFS export, and the board reboots from the new media.\n\nThe normal boot chain then runs: MB1, on to UEFI and L4TLauncher, then Linux and a login (see docs/01)."},
+    {"anchor": "Where it usually fails:", "up": 1, "title": "Most failures are at steps 1, 3 and 5",
+     "body": "No `0955:` device means the jumper, cable or port. A step 3 that never comes up points to IPv6 being off, a firewall, a VPN or a poor-quality cable. A step 5 failure usually means NFS is blocked by a firewall.\n\nDetails and fixes are in `docs/09-troubleshooting.md` and `docs/11-recovery-and-usb-flash.md`."}
+  ]
+}

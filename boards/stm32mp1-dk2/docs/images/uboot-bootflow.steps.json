@@ -1,0 +1,58 @@
+{
+  "title": "How U-Boot finds Linux",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "No hand-written boot script",
+      "body": "ST's default environment runs U-Boot's generic distro boot. The six steps on the left are what happens after U-Boot starts; the right side shows the one file it reads and what to check if it fails."
+    },
+    {
+      "anchor": "boot_device, boot_instance",
+      "title": "1. Where did we come from?",
+      "body": "U-Boot reads the ROM's boot context and sets `boot_device` (here `mmc`) and `boot_instance` (which SD/MMC controller), in `arch/arm/mach-stm32mp/stm32mp1/cpu.c`.",
+      "up": 1
+    },
+    {
+      "anchor": "bootcmd = run bootcmd_stm32mp",
+      "title": "2. A one-second countdown",
+      "body": "After a one-second countdown (a keypress stops it and gives the `STM32MP> ` prompt), `bootcmd_stm32mp` prints `Boot over mmc0!`.",
+      "up": 1
+    },
+    {
+      "anchor": "boot_targets = mmc<boot_instance>",
+      "title": "3. Only the device we booted from",
+      "body": "The script restricts the search to the card the firmware came from, then runs `distro_bootcmd`.",
+      "up": 1
+    },
+    {
+      "anchor": "scan_dev_for_boot_part",
+      "title": "4. Which partition?",
+      "body": "U-Boot lists partitions with the GPT **bootable** flag (`part list mmc N -bootable`). With none it falls back to partition 1, which here is BL2, not a filesystem.",
+      "up": 1
+    },
+    {
+      "anchor": "for prefix in \"/ /boot/\"",
+      "title": "5. Which file?",
+      "body": "For each candidate it tries `<prefix>extlinux/extlinux.conf` with the prefixes `/` and `/boot/`. Finding one runs `sysboot`.",
+      "up": 1
+    },
+    {
+      "anchor": "sysboot → bootz",
+      "title": "6. Load and start",
+      "body": "`sysboot` reads `extlinux.conf`, loads the `LINUX` file to `0xC2000000` and the `FDT` to `0xC4000000`, sets the command line from `APPEND` and `bootz` starts the kernel.",
+      "up": 1
+    },
+    {
+      "anchor": "If it does not boot, read the log",
+      "title": "If it does not boot",
+      "body": "The three lines to look for are `Scanning mmc 0:5...`, `Found /boot/extlinux/extlinux.conf` and `Retrieving file: /boot/zImage`. Stop autoboot to try the commands by hand.",
+      "up": 1
+    },
+    {
+      "anchor": "Why the bootable flag matters",
+      "title": "Why the bootable flag matters",
+      "body": "`image.sh` sets the GPT attribute bit 2 on the rootfs partition only. Without it U-Boot would scan partition 1, which holds BL2.",
+      "up": 1
+    }
+  ]
+}

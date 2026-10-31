@@ -1,0 +1,100 @@
+# Fast checks on every push and pull request. A full firmware build is too heavy for CI: instead
+# every board's scripts are linted and every step is run in explain mode (--dry-run), which executes
+# all the argument handling, path logic and command construction without downloading or compiling.
+# Markdown lint, YAML lint and external link checks run through the shared workflows in
+# N3b3x/hf-general-ci-tools (ci-markdown-lint.yml, ci-yaml-lint.yml, ci-docs-linkcheck.yml).
+name: ci
+
+on:
+  push:
+    branches: [main, 'release/*']
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NO_MKDOCS_2_WARNING: "1"
+
+jobs:
+  boards:
+    name: board · ${{ matrix.board }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        board: [imx8mp-variscite, stm32mp1-dk2, stm32mp2-dk, zynq7000-eclypse-z7, jetson-orin-nano]
+    defaults:
+      run:
+        working-directory: boards/${{ matrix.board }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: shellcheck
+        run: |
+          files=(build.sh scripts/*.sh scripts/lib/*.sh)
+          mapfile -t more < <(find scripts -mindepth 2 -name '*.sh' -not -path 'scripts/lib/*'; find docs/images/_src -name '*.sh' 2>/dev/null)
+          files+=("${more[@]}")
+          shellcheck -x "${files[@]}"
+
+      - name: info
+        run: ./build.sh info
+
+      - name: explain mode (dry-run) of the whole build
+        run: |
+          set -o pipefail
+          ./build.sh --dry-run all 2>&1 | tee "$RUNNER_TEMP/dry-run.log"
+          # errors inside subshells do not change the exit code, so also scan the output
+          if grep -E "FAILED|ERROR:" "$RUNNER_TEMP/dry-run.log"; then
+            echo "::error::--dry-run all reported an error"; exit 1
+          fi
+
+  tooling:
+    name: tooling · workflows, release scripts, flash script
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: shellcheck the release and flashing tools
+        run: shellcheck -x tools/*.sh tools/release/*.sh
+
+      - name: actionlint (GitHub Actions workflows)
+        run: |
+          docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint:1.7.12 -color
+
+      - name: release tooling self-checks
+        run: |
+          python3 -m py_compile tools/*.py tools/release/*.py
+          python3 tools/release/matrix.py > /dev/null
+
+  docs:
+    name: docs · links, diagrams, site
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-docs.txt
+
+      - name: relative links in the Markdown resolve
+        run: python3 tools/check-links.py
+
+      - name: committed diagrams match their generators
+        run: |
+          tools/diagrams.sh
+          git diff --exit-code -- '*.svg' || { echo "::error::a generated SVG is out of date: run tools/diagrams.sh and commit"; exit 1; }
+
+      - name: build the documentation site (strict)
+        run: |
+          pip install -r requirements-docs.txt
+          python3 tools/build-site.py --strict

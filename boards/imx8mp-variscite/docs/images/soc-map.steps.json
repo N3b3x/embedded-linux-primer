@@ -1,0 +1,25 @@
+{
+  "title": "Inside the i.MX 8M Plus",
+  "steps": [
+    {"anchor": null, "title": "One chip, many processors and controllers",
+     "body": "An SoC (system on chip) puts the CPU, memory controller, security hardware and every peripheral on one piece of silicon. This map groups the blocks of the NXP i.MX 8M Plus by function: compute, memory and boot, security, storage, connectivity, multimedia and display.\n\nEvery acronym you meet in boot logs and device trees is one of these boxes. This tour covers the few you meet first."},
+    {"anchor": "4× Cortex-A53", "up": 1, "title": "Four Arm cores run Linux",
+     "body": "The Cortex-A53 cores are the application processors, up to 1.8 GHz. Linux, U-Boot and your programs all run on them. The privilege levels EL0 to EL3 and the TrustZone secure/normal split decide which software may touch which hardware.\n\nThe separate Cortex-M7 is a small real-time core that does not run Linux."},
+    {"anchor": "ROM", "up": 1, "title": "The Boot ROM runs first and cannot be changed",
+     "body": "The **Boot ROM** is code fixed in the chip at the factory and is the first thing to run after reset. It looks for the next stage on the boot device and loads it into on-chip RAM.\n\nIt is also why the bootloader has to sit at a fixed place on the card: the ROM only looks where it was built to look."},
+    {"anchor": "OCRAM", "up": 1, "title": "On-chip RAM holds the earliest loaders",
+     "body": "OCRAM is 576 KiB of RAM inside the chip. External DRAM does not work yet at power-on, so the first stage (SPL) and then BL31 live here.\n\nThe SPL's main job is to make the next block, the DRAM controller, usable."},
+    {"anchor": "DDRC + DDR PHY", "up": 1, "title": "The DRAM controller needs training firmware",
+     "body": "The LPDDR4 controller and its PHY (the analog interface to the memory chips) must be trained before the board has working main memory. This needs a training firmware blob loaded by the SPL.\n\nIf this step fails, the board stays silent: nothing reaches the serial console."},
+    {"anchor": "CAAM", "up": 1, "title": "Security blocks decide what is trusted",
+     "body": "**HAB** is the signed-image check done by the ROM, **CAAM** is the crypto accelerator, **SNVS** keeps the RTC and power key, and **CSU**, **RDC** and **AIPSTZ** limit which cores may reach which peripherals.\n\nOn a development board they are mostly configured open, but TF-A programs them early in boot, so they appear in its source."},
+    {"anchor": "uSDHC1-3", "up": 1, "title": "The storage controllers read your SD card and eMMC",
+     "body": "The three uSDHC controllers drive SD, eMMC and SDIO devices. Both the ROM and U-Boot use them to load the next stage and the kernel.\n\nClocks (CCM), power domains (GPC), DMA (SDMA), the watchdog and GPIO banks sit in the same group and are what drivers lean on constantly."},
+    {"anchor": "EQoS · FEC", "up": 1, "title": "Connectivity blocks become devices you name",
+     "body": "Each controller shows up in Linux under a name you recognise: the EQoS Ethernet is `eth0`, the FEC is `eth1`, the CAN controllers are `can0` and `can1`, and the UARTs are `ttymxcN`.\n\nThe serial console you use for debugging is one of these UARTs."},
+    {"anchor": "GPU 3D/2D", "up": 1, "title": "Multimedia and AI accelerators",
+     "body": "The GPU (driver `galcore`), the VPU for H.264 and H.265 video, the 2.3 TOPS NPU, the ISPs and the HiFi4 audio DSP are optional extras for most projects. The display, camera and audio interfaces below them (LVDS, MIPI, SAI, PWM) connect the panel and sensors.\n\nA plain headless Linux boot does not need any of them."},
+    {"anchor": null, "title": "Takeaway: most blocks are a device-tree node and a driver",
+     "body": "In Linux, most blocks appear as a node in the device tree and as a driver in `dmesg`. When a log line names an acronym, find its box here first.\n\nFull names and purposes are in `docs/14-acronyms.md`."}
+  ]
+}

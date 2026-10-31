@@ -1,0 +1,58 @@
+{
+  "title": "The code that runs, in order",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "Four stages, the files that matter in each",
+      "body": "Each coloured block is one stage with the repository it lives in. The rows are the source files worth opening to understand or change that stage; all paths are relative to the checkouts under `build/src/`."
+    },
+    {
+      "anchor": "BL2",
+      "title": "BL2: find the FIP, start the memory",
+      "body": "`bl2_io_storage.c` finds the FIP partition. `bl2_plat_setup.c` calls `stm32mp1_ddr_probe()` and loads the images; `plat_bl2_mem_params_desc.c` and the `fw-config` device tree say where each goes. The DDR3 driver itself is `drivers/st/ddr/stm32mp1_ddr.c`.",
+      "up": 1
+    },
+    {
+      "anchor": "core/arch/arm/plat-stm32mp1/conf.mk",
+      "title": "OP-TEE: configuration decides what it is",
+      "body": "`conf.mk` fixes the secure RAM at `0xde000000`, turns the pager on and enables the SCMI message server (`CFG_SCMI_MSG_DRIVERS`). `main.c` is the platform start-up and prints the platform banner.",
+      "up": 1
+    },
+    {
+      "anchor": "core/arch/arm/sm/sm_a32.S",
+      "title": "The monitor is OP-TEE",
+      "body": "`sm_smc_entry()` is the handler for every `smc` from the normal world. On the 64-bit board this job belongs to BL31; here there is none.",
+      "up": 1
+    },
+    {
+      "anchor": "core/arch/arm/plat-stm32mp1/scmi_server.c",
+      "title": "The SCMI server's tables",
+      "body": "This file lists the clocks, reset domains and voltage domains the server answers for. The STPMIC1 rails (`buck4` = `v3v3`, which powers the SD card) are rows in it.",
+      "up": 1
+    },
+    {
+      "anchor": "U-Boot",
+      "title": "U-Boot: from boot device to bootz",
+      "body": "`stm32mp1/cpu.c` sets `boot_device` and `boot_instance`, `stm32mp15_st_common.h` defines `bootcmd_stm32mp`, `config_distro_bootcmd.h` scans for `extlinux.conf`, `sysboot.c` parses it and `bootz.c` starts the kernel.",
+      "up": 1
+    },
+    {
+      "anchor": "drivers/firmware/scmi/optee_agent.c",
+      "title": "U-Boot is an SCMI client too",
+      "body": "U-Boot also asks OP-TEE for clocks and regulators (`CONFIG_SCMI_FIRMWARE` in `stm32mp15_defconfig`), which is why its device tree is the SCMI variant.",
+      "up": 1
+    },
+    {
+      "anchor": "Linux",
+      "title": "Linux: the SCMI side of the device tree and the drivers",
+      "body": "`stm32mp15-scmi.dtsi` declares the `scmi` node and its protocols, `transports/optee.c` turns each message into a call into OP-TEE, and `scmi-regulator.c` is what switches the SD card's supply. `mmci.c` is the card controller and `stm32-usart.c` the console.",
+      "up": 1
+    },
+    {
+      "anchor": "init/main.c",
+      "title": "The end of the chain",
+      "body": "`kernel_init()` runs `/sbin/init`. From here on, the boot chain is over and the distribution takes over.",
+      "up": 1
+    }
+  ]
+}

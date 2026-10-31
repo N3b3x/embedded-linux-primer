@@ -1,0 +1,7 @@
+
+# ---- Phase 3a: only the root filesystem (partition 1) of the user area ----
+
+# Write the bytes of the image from 8 MiB on (where partition 1 starts) to the same place in the eMMC.
+# The partition table, the bootloader copies and U-Boot's saved environment are not touched, so the
+# eMMC must have been flashed with this layout before. -skip counts bytes in the file, -seek bytes on the eMMC.
+FB: write -f @IMAGE@ -skip @P1_OFFSET@ -seek @P1_OFFSET@

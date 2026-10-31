@@ -1,0 +1,66 @@
+{
+  "title": "STM32MP157F-DK2 and STM32MP257F-DK",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "One family, two boot chains",
+      "body": "The two boards share the ROM-to-BL2-to-FIP design and the SD image rules, but they are built from different directories because the CPU architecture, toolchains and several boot components differ. The strips at the top show the stages; the table lists what is the same and what differs."
+    },
+    {
+      "anchor": "STM32MP157F-DK2",
+      "title": "This board: five stages",
+      "body": "Cortex-A7, 32-bit Armv7-A, 512 MiB of DDR3. The DDR driver is inside BL2 and OP-TEE is the monitor, so the chain is ROM, BL2, OP-TEE, U-Boot, Linux.",
+      "nth": 0,
+      "up": 1
+    },
+    {
+      "anchor": "none on this chip",
+      "title": "No BL31 here",
+      "body": "On the 64-bit chip TF-A keeps a resident monitor (BL31) at EL3. On this 32-bit chip OP-TEE handles `smc` and PSCI itself.",
+      "up": 1
+    },
+    {
+      "anchor": "STM32MP257F-DK",
+      "title": "The 64-bit sibling",
+      "body": "Cortex-A35, ARMv8-A, 4 GiB of LPDDR4. It needs ST's DDR training firmware and has a resident BL31; its SCMI server serves clocks and resets only.",
+      "nth": 0,
+      "up": 1
+    },
+    {
+      "anchor": "SD image format",
+      "title": "What is the same: the SD image",
+      "body": "Both use a GPT, rootless assembly, a FIP found by type GUID and `extlinux.conf` on the bootable partition. A reader who knows one image layout knows the other.",
+      "up": 1
+    },
+    {
+      "anchor": "First-stage partition",
+      "title": "The partition names differ",
+      "body": "The ROM looks for `fsbl1` and `fsbl2` on this chip and `fsbla1` and `fsbla2` on the 64-bit one. The names are contracts with the silicon, so neither board may rename them.",
+      "up": 1
+    },
+    {
+      "anchor": "SCMI server",
+      "title": "The SCMI server differs",
+      "body": "OP-TEE's own server on this chip serves clocks, resets and voltage domains; the 64-bit chip uses Arm's SCP-firmware inside OP-TEE, which at the pinned version serves clocks and resets only.",
+      "up": 1
+    },
+    {
+      "anchor": "SD card supply",
+      "title": "The consequence for the SD card",
+      "body": "Here the card's supply is a served voltage domain, so the stock kernel device tree boots. On the 64-bit board a patched tree with fixed regulators is booted instead.",
+      "up": 1
+    },
+    {
+      "anchor": "Root filesystem",
+      "title": "The userland must match the CPU",
+      "body": "Debian `armhf` or Alpine `armv7` here, `arm64` or `aarch64` on the other board. A 64-bit rootfs does not run on this kernel. Building the Debian image needs an emulator (qemu) on any PC that cannot run 32-bit ARM code.",
+      "up": 1
+    },
+    {
+      "anchor": "Pinned releases",
+      "title": "Same releases, same discipline",
+      "body": "Both boards use TF-A 2.15.0, OP-TEE 4.11.0, U-Boot 2026.07 and Linux 6.18.58, pinned by commit or checksum.",
+      "up": 1
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+ "title": "From power-on to login on the Jetson Orin Nano",
+ "steps": [
+  {
+   "anchor": null,
+   "title": "Seven stages, five of them NVIDIA binaries",
+   "body": "Read the left column from top to bottom: each card is one stage that starts the next. Each card says which processor runs it and where its code is stored. The orange panel on the right lists extra firmware for the chip's other cores.\n\nThe firmware (stages 1 to 5) lives in the module's QSPI-NOR flash, a small boot flash on the module itself. NVIDIA ships it as binaries, so you configure it rather than compile it."
+  },
+  {
+   "anchor": "BootROM starts as the BPMP",
+   "title": "The BootROM is silicon and starts everything",
+   "body": "The BootROM is code hard-wired into the chip. It runs on the BPMP (the boot and power management processor) as it leaves reset, initializes the QSPI-NOR boot media and loads the first boot images, including MB1.\n\nIt also checks signatures: the PSC ROM holds the NVIDIA and OEM keys and authenticates MB1 and PSC-BL1. Because it is mask ROM, software cannot damage it, which is why recovery mode can always work."
+  },
+  {
+   "anchor": "Platform setup: pinmux",
+   "title": "MB1 sets up the platform and the memory",
+   "body": "MB1 (Microboot 1) runs on the BPMP and is stored in `A_mb1`, with its configuration in `A_MB1_BCT` and `A_MEM_BCT`. A BCT is a boot configuration table: board data that the binary reads.\n\nMB1 configures pinmux, GPIO, pad voltages and firewalls, initializes the SDRAM from the Memory BCT, loads the firmware for the CPU complex and sets the PMIC rail for the CPUs. Without it there is no working RAM for anything after it."
+  },
+  {
+   "anchor": "Next-stage bootloader on the CPU complex",
+   "title": "MB2 is the first code on the Arm cores",
+   "body": "MB2 (Microboot 2) is stored in `A_mb2` and runs on the CCPLEX, NVIDIA's name for the CPU complex, the Arm cores that will later run Linux.\n\nThe same component also receives images from the host PC when you flash the board, in cold-boot flashing and in RCM boot. That is why the flash flow depends on it."
+  },
+  {
+   "anchor": "EDK2-based",
+   "title": "UEFI chooses where the OS comes from",
+   "body": "UEFI is the CPU bootloader (CPUBL), stored in `A_cpu-bootloader`, which is 3.5 MiB. It is built on EDK2 and its source is public in NVIDIA/edk2-nvidia.\n\nIt applies the `.dtbo` overlays shipped in `kernel/dtb` (`L4TConfiguration`, `BootOrder` and others), picks the boot device from `DefaultBootPriority` and starts the OS loader. The secure OS (OP-TEE) sits next to it in `A_secure-os`, 4 MiB."
+  },
+  {
+   "anchor": "Shipped default",
+   "title": "L4TLauncher loads the kernel named in extlinux.conf",
+   "body": "L4TLauncher is UEFI's default OS loader. It is the file `EFI\\BOOT\\BOOTAA64.efi` on the `esp` (the small FAT partition that UEFI reads).\n\nWith the shipped `L4TDefaultBootMode = 1` it loads the kernel, initrd and device tree listed in `/boot/extlinux/extlinux.conf` on the root filesystem. Other modes take the kernel and DTB from the `kernel` and `kernel-dtb` partitions, or start GRUB."
+  },
+  {
+   "anchor": "Gets the device tree and a command line",
+   "title": "The kernel is the first stage this repository builds",
+   "body": "Linux 5.15.148-tegra is read from `/boot/Image` and `/boot/initrd` on the root filesystem. It receives the device tree and a command line with `root=PARTUUID=...`.\n\nThe initrd (a small initial RAM filesystem) mounts the real root filesystem from SD, NVMe or USB, then the kernel starts `/sbin/init`, which is systemd. The card's badge says `built by this repo`: `./build.sh` compiles it from NVIDIA's public sources."
+  },
+  {
+   "anchor": "NVIDIA's L4T libraries",
+   "title": "Userland ends at a login prompt",
+   "body": "The last stage is the Ubuntu 22.04 userland on the `APP` partition (ext4), started by systemd. NVIDIA's L4T libraries (core, display, camera, multimedia) sit on top of the Ubuntu base.\n\nFirst boot ends at a login prompt for the user you created during the build, with no first-boot wizard."
+  },
+  {
+   "anchor": "rect:1062,104,306,630",
+   "title": "Other cores get their own firmware, in two copies",
+   "body": "The chip has several processors besides the Arm cores, for example the SPE (sensor processing engine), RCE (camera real-time core), DCE (display engine) and ADSP (audio). Each loads firmware from its own partition such as `A_spe-fw` or `A_dce-fw`, all in QSPI-NOR.\n\nEvery partition exists twice, `A_` and `B_`, so there are two complete boot chains and a failed firmware update does not leave the board dead. Names and sizes come from `bootloader/generic/cfg/flash_t234_qspi.xml`."
+  },
+  {
+   "anchor": "Stages 1-5 are NVIDIA",
+   "title": "The module holds the firmware, the drive holds the OS",
+   "body": "The eMMC-less Orin Nano has no storage of its own except the 64 MiB QSPI-NOR. The firmware always sits there, and the OS lives on the SD card, NVMe or USB drive you attach.\n\nThat split is the key difference from SD-card boards, and it is why flashing needs NVIDIA's tools and recovery mode.",
+   "pad": 10
+  }
+ ]
+}

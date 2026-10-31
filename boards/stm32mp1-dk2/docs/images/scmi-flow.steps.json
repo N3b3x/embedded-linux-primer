@@ -1,0 +1,64 @@
+{
+  "title": "A regulator request through the secure world",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "Powering the SD card takes a trip into the secure world",
+      "body": "Six lanes, left to right: three Linux layers, then OP-TEE's monitor and SCMI server (both secure world) and the power chip. Time runs downward; teal arrows are the normal world, rose arrows the secure world, dashed arrows the return.\n\nThe example: the SD card driver needs its supply. SCMI is Arm's System Control and Management Interface, a message protocol; here it is carried by `smc`, the instruction that crosses into the secure world."
+    },
+    {
+      "anchor": "regulator_get / regulator_enable(vmmc)",
+      "title": "1. The SD card driver asks for its supply",
+      "body": "During `mmci_probe()` the driver asks the regulator framework for its `vmmc` supply. Without power the card cannot work, and the root filesystem is on that card.",
+      "up": 1
+    },
+    {
+      "anchor": "vmmc-supply = <&scmi_v3v3>",
+      "title": "2. The supply is an SCMI voltage domain",
+      "body": "The device tree says `vmmc-supply = <&scmi_v3v3>`. That regulator is not a driver for a chip Linux can reach: the power chip's I²C bus is disabled for Linux, so the regulator is an SCMI voltage domain, number `VOLTD_SCMI_STPMIC1_BUCK4`.",
+      "up": 1
+    },
+    {
+      "anchor": "voltage domain enable",
+      "title": "3. Linux sends an SCMI voltage-domain message",
+      "body": "The SCMI regulator driver builds a message for protocol `0x17`, voltage domain. The reply will carry a status.",
+      "up": 1
+    },
+    {
+      "anchor": "SCMI message in shared memory",
+      "title": "4. The transport puts it in shared memory",
+      "body": "The `arm_scmi` OP-TEE transport opens a session to OP-TEE's pseudo trusted application for SCMI and hands over the message in a shared buffer.",
+      "up": 1
+    },
+    {
+      "anchor": "smc  OPTEE_SMC_CALL_WITH_ARG",
+      "title": "5. An smc crosses into the secure world",
+      "body": "The `smc` instruction traps into the monitor, which is part of OP-TEE on this 32-bit chip. There is no separate BL31.",
+      "up": 1
+    },
+    {
+      "anchor": "sm_smc_entry",
+      "title": "6. The monitor saves the normal world",
+      "body": "`sm_smc_entry` saves the normal-world context and runs OP-TEE's thread that serves the call.",
+      "up": 1
+    },
+    {
+      "anchor": "pta/scmi.c → scmi_server",
+      "title": "7. The SCMI server finds the rail",
+      "body": "`pta/scmi.c` hands the message to the SCMI server, which looks the domain up in its table: the row for `buck4` is the rail named `v3v3`.",
+      "up": 1
+    },
+    {
+      "anchor": "set the buck4 rail on",
+      "title": "8. OP-TEE switches the rail",
+      "body": "OP-TEE's own driver talks to the STPMIC1 over I²C4 and enables the rail. The status goes back through the shared buffer and the `smc` returns.",
+      "up": 1
+    },
+    {
+      "anchor": "Why does a regulator need a round trip?",
+      "title": "Takeaway: this is why the SD card works here",
+      "body": "OP-TEE's STM32MP15 server serves voltage domains. The 64-bit board's STM32MP25 server serves clocks and resets only, so that board needs a workaround device tree; this one boots the stock tree.",
+      "up": 1
+    }
+  ]
+}

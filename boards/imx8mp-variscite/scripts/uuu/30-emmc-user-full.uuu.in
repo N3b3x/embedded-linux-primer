@@ -1,0 +1,12 @@
+
+# ---- Phase 3a: the user area (partition table + root filesystem) ----
+
+# Zero the 1 MiB at 7 MiB, where U-Boot keeps its saved environment (16 KiB at CONFIG_ENV_OFFSET 0x700000). The
+# block-mapped write below skips blocks that are empty in the image, so an environment saved by an earlier install
+# would survive and could keep an old fdt_file or bootcmd.
+FB: ucmd mw.b ${fastboot_buffer} 0 @ENV_SIZE@
+FB: ucmd mmc write ${fastboot_buffer} @ENV_BLK@ @ENV_BLKS@
+
+# Write the whole SD-card image to the eMMC user area: MBR, imx-boot copy at 32 KiB, ext4 partition at 8 MiB.
+# -raw2sparse cuts it into sparse chunks and -bmap sends only the blocks that contain data.
+FB: flash -raw2sparse @BMAP_ARGS@ all @IMAGE@

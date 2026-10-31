@@ -1,0 +1,23 @@
+{
+  "title": "The code that runs, in order",
+  "steps": [
+    {"anchor": null, "title": "Four stages, four source trees",
+     "body": "The picture lists the files to open when you want to understand or change a boot step, in the order they run: SPL, BL31, U-Boot, Linux. The paths are inside `build/src/` after a build.\n\nEach file is explained with real code in `docs/15-source-tour.md`."},
+    {"anchor": "board/variscite/imx8mp_var_dart/spl.c", "up": 1, "title": "SPL brings up DRAM",
+     "body": "The SPL (secondary program loader, U-Boot's tiny first stage) starts in `board_init_f()`: clocks, UART, PMIC, then DRAM. `spl_dram_init()` reads the SoM EEPROM and adjusts timings, and `ddr_init.c` loads the training firmware into the PHY.\n\n`enable_tzc380()` in `soc.c` switches on the TZASC, and `spl_fit.c` reads the FIT image and jumps to BL31."},
+    {"anchor": "bl31/bl31_main.c", "up": 1, "title": "BL31 is the secure monitor that stays resident",
+     "body": "The `imx-atf` tree holds BL31. `bl31_main.c` is the generic TF-A start-up: runtime services, then exit to BL33 (U-Boot).\n\n`imx8mp_bl31_setup.c` sets the CSU/RDC/TZASC rules and the BL33 entry at `0x4020_0000` at EL2."},
+    {"anchor": "plat/imx/imx8m/imx8m_psci_common.c", "up": 1, "title": "PSCI and SiP calls are BL31's services",
+     "body": "`imx_pwr_domain_on()` is how PSCI `CPU_ON` powers a core. `imx_sip_svc.c` handles the `0xC2…` NXP SiP calls such as DDR DVFS and GPC.\n\nLinux reaches these through `smc` instructions."},
+    {"anchor": "board/variscite/imx8mp_var_dart/imx8mp_var_dart.c", "up": 1, "title": "U-Boot customises itself for the board",
+     "body": "`board_late_init()` reads the EEPROM to set `board_name` and the console. `imx8mp_var_dart.env` is the default environment holding `bsp_bootcmd` and `findfdt`.\n\n`cmd/booti.c` relocates the Image, passes the DTB in `x0` and jumps."},
+    {"anchor": "arch/arm64/kernel/head.S", "up": 1, "title": "Linux starts in assembly",
+     "body": "`head.S` holds the first kernel instructions: MMU on, EL2 stub, then C. `psci.c` implements `psci_0_2_cpu_on()` which ends in `arm_smccc_smc()`, the call into BL31."},
+    {"anchor": "drivers/rtc/rtc-ds1307.c", "up": 1, "title": "Drivers bind through the device tree",
+     "body": "`drivers/of/platform.c` turns DT nodes into devices and `i2c-imx.c` is the I2C controller driver. `rtc-ds1307.c` contains the `of_match_table` and `ds1307_probe()` for the board's RTC.\n\nThe same compatible string is in the device tree."},
+    {"anchor": "init/main.c", "up": 1, "title": "init/main.c hands over to userspace",
+     "body": "`kernel_init()` calls `run_init_process(\"/sbin/init\")`, the last step of this map.\n\nFrom here on it is just Linux."},
+    {"anchor": "Each file is explained, with the real code, in docs/15-source-tour.md. Grep tips: grep -rn \"bsp_bootcmd\" build/src/uboot-imx/board/variscite/ ·", "title": "Takeaway: grep for a string to find the file",
+     "body": "Grep the tree for a variable, compatible string or constant, such as `bsp_bootcmd`, `dallas,ds1337` or `IMX_SIP_`, to land in the right file."}
+  ]
+}

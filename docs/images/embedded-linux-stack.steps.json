@@ -1,0 +1,45 @@
+{
+  "title": "The six layers of an embedded Linux board",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "Six layers, always started in this order",
+      "body": "Whatever the vendor calls them, every board boots through the same six layers.\n\nThis walkthrough takes them one at a time. Use **→** and **←**, or press **space** to play."
+    },
+    {
+      "anchor": "Boot ROM", "up": 1,
+      "title": "1 · Boot ROM: the part you can never change",
+      "body": "Code inside the chip, fixed at the factory. It reads the **boot-mode switch**, looks for the next stage on SD, eMMC, QSPI or USB and loads it into on-chip RAM.\n\nIt decides **where your first loader must sit** on the storage, which is why every board's image layout is different."
+    },
+    {
+      "anchor": "First-stage firmware", "up": 1,
+      "title": "2 · First-stage firmware and the secure world",
+      "body": "DRAM does not work at power-on: this layer **trains it**, from on-chip RAM. It then installs the **secure monitor** (TF-A, at the highest privilege level) and optionally a trusted OS (OP-TEE).\n\nWhen this layer is wrong the board prints **nothing at all**."
+    },
+    {
+      "anchor": "Bootloader", "up": 1,
+      "title": "3 · Bootloader: U-Boot or UEFI",
+      "body": "The first stage with a prompt. It picks a kernel and a **device tree**, builds the kernel command line (`console=`, `root=`) and jumps. Most boot problems are fixed here, from the serial console, without re-flashing."
+    },
+    {
+      "anchor": "Kernel + device tree", "up": 1,
+      "title": "4 · Kernel and device tree",
+      "body": "Linux, plus the **device tree**: a data file that tells it which hardware exists and where, because an SoC's peripherals cannot be discovered like PCI devices. Most board customization happens at this layer."
+    },
+    {
+      "anchor": "Root filesystem", "up": 1,
+      "title": "5 · Root filesystem",
+      "body": "Everything in `/`: init, shell, libraries, packages. This is the layer that is *just Linux*. Debian, Alpine, a vendor image or a Yocto build all fit here."
+    },
+    {
+      "anchor": "Your application", "up": 1,
+      "title": "6 · Your application",
+      "body": "The reason the board exists, and the only layer that changes weekly. Everything below it should change as rarely as possible, which is why this repository makes layers 2 to 5 **reproducible**."
+    },
+    {
+      "anchor": ["./build.sh uboot", "./build.sh kernel", "./build.sh rootfs", "./build.sh image"],
+      "title": "How this repository maps onto the layers",
+      "body": "`./build.sh uboot` builds layers 2 and 3, `kernel` layer 4, `rootfs` layer 5, and `image` glues 1 to 5 into one flashable artifact."
+    }
+  ]
+}

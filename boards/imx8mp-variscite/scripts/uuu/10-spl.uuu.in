@@ -1,0 +1,12 @@
+
+# ---- Phase 1: Boot ROM -> SPL -> U-Boot, all over USB (nothing is written to storage) ----
+
+# The i.MX8M Plus Boot ROM in serial download mode (USB 1fc9:0146) speaks uuu's "stream" protocol (SDPS).
+# One command streams the whole of imx-boot.bin: the ROM starts the SPL out of on-chip RAM, the SPL trains
+# the LPDDR4 and then asks the ROM for the rest (DDR firmware, TF-A BL31, U-Boot proper), which arrives over
+# the same USB link. -t 60000: allow 60 s per transfer, the SPL pauses for DDR training between reads.
+# (The SDP and SDPV protocols of i.MX6/7/8MM/8MQ are not needed: uuu would skip them on this chip.)
+SDPS[-t 60000]: boot -f @FLASH_BIN@
+
+# From here the board runs U-Boot from RAM and has switched its USB port to a fastboot gadget
+# (USB 1fc9:0152): every "FB:" line below is a fastboot command, sent to U-Boot.

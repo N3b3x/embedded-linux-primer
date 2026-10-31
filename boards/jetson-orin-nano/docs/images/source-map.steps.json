@@ -1,0 +1,23 @@
+{
+  "title": "The files to open, in boot order",
+  "steps": [
+    {"anchor": null, "title": "A reading list that follows the boot",
+     "body": "Each coloured band is one stage of the boot, in the same order as the boot-chain diagram, with the real files behind it. Left column: the stage; middle: the path; right: what the file is for.\n\nPaths are relative to `build/work/Linux_for_Tegra/` after `./build.sh fetch rootfs kernel`. A file marked binary is shipped compiled by NVIDIA, so there is nothing to read in it."},
+    {"anchor": "BootROM · MB1", "up": 1, "title": "For MB1, read the config, not the binary",
+     "body": "`bootloader/mb1_t234_prod.bin` is MB1 itself, signed and encrypted by NVIDIA. What you can read is its configuration: the pinmux file `tegra234-mb1-bct-pinmux-p3767-dp-a03.dtsi` is a device tree source for the module.\n\n`flash_t234_qspi.xml` says which firmware image goes into which QSPI-NOR partition and how large it is. Change a pin function or a partition size here and you must reflash the firmware."},
+    {"anchor": "Board specification", "up": 1, "title": "The board .conf tells the flash tool what this board is",
+     "body": "`jetson-orin-nano-devkit-super.conf` is the board definition: it picks the device tree (`DTB_FILE`), the BPMP dtb, the pinmux and the layouts. `p3767.conf.common` holds settings shared by every P3767 module (Orin Nano and Orin NX).\n\n`flash.sh` and `tools/kernel_flash/l4t_initrd_flash.sh` are the drivers that turn the partition XML plus the `.conf` into signed images and flash them."},
+    {"anchor": "MB2 · UEFI · L4TLauncher", "up": 1, "title": "UEFI is configured by files you can open",
+     "body": "`mb2_t234.bin` and `uefi_jetson.bin` are shipped as binaries, though the UEFI source is public at github.com/NVIDIA/edk2-nvidia.\n\nUEFI's settings, such as the boot mode and boot device order, arrive as device-tree overlays: `L4TConfiguration.dtbo` and `BootOrder*.dtbo`. L4TLauncher is `BOOTAA64.efi`, and `extlinux.conf` is copied into the root filesystem's `/boot/extlinux/`."},
+    {"anchor": "Secure OS", "up": 1, "title": "The secure OS ships as an image, with sources alongside",
+     "body": "The secure OS is OP-TEE, a small trusted operating system that runs apart from Linux. Its image is `bootloader/tos-optee_t234.img`, and `SOURCE.tos-optee_t234.img` names the sources it came from.\n\nThose sources are the tarballs `atf_src.tbz2` and `nvidia-jetson-optee-source.tbz2`, which unpack to `arm-trusted-firmware/` and `optee/optee_os/`."},
+    {"anchor": "Linux kernel", "up": 1, "title": "The kernel has a recipe, a config and out-of-tree modules",
+     "body": "`source/kernel/Makefile` is NVIDIA's own build recipe (defconfig, Image, dtbs, modules), which `./build.sh kernel` unrolls into visible steps. The configuration is the arm64 `defconfig` of Linux 5.15.148 with the `-tegra` local version.\n\nThe out-of-tree modules (GPU, display, camera, hardware performance) live in `nvidia-oot/`, `nvgpu/`, `nvdisplay/` and `hwpm/`, built separately from the kernel tree."},
+    {"anchor": "Device tree", "up": 1, "title": "The device tree is layered, from board down to module",
+     "body": "A device tree describes the hardware to the kernel. The Orin Nano Super devkit file `...-nv-super.dts` includes the `-nv.dts` and trims the CPU OPP table (the allowed frequency and voltage points).\n\nBelow it sit the nodes shared by every module on this carrier (aliases, I2S, DMIC, thermal, camera) and the carrier (P3768) and module (P3767) layers. `generic-dts/Makefile` shows how the `.dts` files become `kernel/dtb/*.dtb`."},
+    {"anchor": "User space", "up": 1, "title": "Two scripts build the userland around the sample rootfs",
+     "body": "`apply_binaries.sh` and `nv_tegra/nv-apply-debs.sh` install NVIDIA's Debian packages and tarballs into `rootfs/`.\n\n`tools/l4t_create_default_user.sh` creates the login account, and `tools/l4t_update_initrd.sh` rebuilds the initrd, which must match the modules."},
+    {"anchor": "Handy: grep", "pad": 10, "title": "Search the tree instead of memorizing it",
+     "body": "The footer gives three searches: `grep -rn \"p3767\"` over the board `.conf` files, `grep -rn \"MAXN_SUPER\"` over `source/hardware/`, and `dtc -I dtb -O dts kernel/dtb/L4TConfiguration.dtbo` to read a compiled overlay as text.\n\nEach file on the page is explained, with what to change and where, in `docs/15-source-tour.md`."}
+  ]
+}

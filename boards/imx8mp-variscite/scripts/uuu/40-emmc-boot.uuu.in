@@ -1,0 +1,22 @@
+
+# ---- Phase 3b: the bootloader in the eMMC boot partitions, and the ROM's boot configuration ----
+
+# Send imx-boot.bin to RAM once ...
+FB: download -f @FLASH_BIN@
+# ... and copy it to the start (offset @BOOT_OFFSET_BLK@) of boot0 and boot1. "mmc dev <n> 1|2" selects the
+# hardware boot partition 1 (boot0) or 2 (boot1). The i.MX8M Plus ROM expects the container at the very
+# start of a boot partition, not at the 32 KiB offset used on SD and in the user area.
+FB: ucmd mmc dev ${emmc_dev} 1
+FB: ucmd mmc write ${fastboot_buffer} @BOOT_OFFSET_BLK@ @BOOT_BLKS@
+FB: ucmd mmc dev ${emmc_dev} 2
+FB: ucmd mmc write ${fastboot_buffer} @BOOT_OFFSET_BLK@ @BOOT_BLKS@
+
+# Back to the user area, so nothing later in this script lands in a boot partition.
+FB: ucmd mmc dev ${emmc_dev} 0
+
+# Tell the eMMC (EXT_CSD PARTITION_CONFIG) to boot from boot partition @BOOT_PART@ with boot acknowledge @BOOT_ACK@
+# ("mmc partconf <dev> <ack> <boot partition> <access>"). Without this the ROM does not look at the boot
+# partitions at all and boots the user-area copy at 32 KiB, if there is one.
+FB: ucmd mmc partconf ${emmc_dev} @BOOT_ACK@ @BOOT_PART@ 0
+# Read it back: U-Boot prints BOOT_ACK, BOOT_PARTITION_ENABLE (boot0) and PARTITION_ACCESS (visible with uuu -v).
+FB: ucmd mmc partconf ${emmc_dev}

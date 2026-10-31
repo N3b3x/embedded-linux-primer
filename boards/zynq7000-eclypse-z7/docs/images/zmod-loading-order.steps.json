@@ -1,0 +1,67 @@
+{
+  "title": "Where the Zmod ADC fits",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "A map, not a build",
+      "body": "A Zmod pod plugs into a SYZYGY port. The port is wired to the FPGA, so the processors cannot reach the ADC until a design in the fabric provides a controller for it and Linux has a driver for that controller. The row at the bottom is the order in which to do the work."
+    },
+    {
+      "anchor": [
+        "Zmod Scope pod",
+        "SYZYGY port A / B"
+      ],
+      "title": "The pod and its port",
+      "body": "A Zmod Scope is a two-channel, 14-bit, 100 MS/s ADC board. It plugs into SYZYGY port A or B, each wired to its own bank of fabric I/O and not to the processors. A small microcontroller on the board reads the pod's identity over I2C and sets the port's supply voltage first.\n\nPods are not hot-swappable: power the board off before you plug or unplug one.",
+      "up": 1
+    },
+    {
+      "anchor": "PL: your design",
+      "title": "The design in the fabric",
+      "body": "Digilent publishes IP for each Zmod: a controller with AXI-Lite registers and a stream output, plus a standard AXI DMA that moves the stream into DDR. You instantiate them in Vivado with the board's PS preset and produce a bitstream. Nothing of it exists until the bitstream is loaded.",
+      "up": 1
+    },
+    {
+      "anchor": "AXI HP/GP + IRQ_F2P",
+      "title": "The way samples reach the PS",
+      "body": "Registers are read through a general-purpose port; the DMA writes samples to memory through a high-performance port; completion interrupts arrive on `IRQ_F2P` lines, which the device tree must name by number.",
+      "up": 1
+    },
+    {
+      "anchor": "PS: Linux",
+      "title": "The driver",
+      "body": "The kernel already has `xilinx_dma` for the DMA engine. The ADC controller needs its own driver (an IIO driver, or Digilent's UIO plus `xilinx_axidma` approach), and a device-tree node with the addresses and interrupt numbers from the Vivado export.",
+      "up": 1
+    },
+    {
+      "anchor": "1  PS boots",
+      "title": "Step 1: get the PS working first",
+      "body": "Everything in this repository. If the board boots, has a console and Ethernet, any later problem is in the PL design or the driver, not in the boot chain.",
+      "up": 1
+    },
+    {
+      "anchor": "2  PL design",
+      "title": "Step 2: build the PL design",
+      "body": "In Vivado, outside this repository. Start from the board preset and Digilent's published Zmod design. Export the bitstream and the hardware handoff: it lists every register address and interrupt line.",
+      "up": 1
+    },
+    {
+      "anchor": "3  Load it",
+      "title": "Step 3: load the bitstream before anything touches it",
+      "body": "The Zynq FPGA manager wants a byte-swapped `.bin`, produced with `bootgen`. Load it in U-Boot, or in a vendor-style `BOOT.BIN`, or from Linux through `fpga_manager`. The driver must not probe before it is loaded.",
+      "up": 1
+    },
+    {
+      "anchor": "4  Describe it",
+      "title": "Step 4: the device-tree nodes",
+      "body": "A static node if the bitstream was loaded before Linux; an overlay if Linux loads it at runtime (the mainline kernel has no ready userspace overlay interface, so a runtime route needs more kernel work). The reference values come from the hardware handoff.",
+      "up": 1
+    },
+    {
+      "anchor": "5  Driver",
+      "title": "Step 5: the driver, then user space",
+      "body": "Once the nodes bind, samples are read from the driver's device. That driver is the one piece nobody ships for mainline; budget the most time here.",
+      "up": 1
+    }
+  ]
+}

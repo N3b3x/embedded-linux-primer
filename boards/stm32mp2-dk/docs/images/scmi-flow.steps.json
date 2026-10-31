@@ -1,0 +1,25 @@
+{
+  "title": "A clock request through the secure world",
+  "steps": [
+    {"anchor": null, "title": "Enabling one clock takes a trip into the secure world",
+     "body": "Six lanes, left to right, are the actors: three Linux layers at EL1, then BL31 (the EL3 monitor), the OP-TEE core (SCMI server at S-EL1) and the clock hardware. Time runs downward; teal arrows are the normal world, rose arrows the secure world, dashed arrows the return.\n\nThe example: the SD card driver wants its clock on. SCMI is Arm's System Control and Management Interface, a message protocol; here it is carried by `smc`, the instruction that crosses into the secure world."},
+    {"anchor": "rect:30,170,350,60", "title": "1. The SD card driver asks for its kernel clock",
+     "body": "During `mmci_probe()` the driver calls `clk_prepare_enable(ck_ker_sdmmc1)`. The call lands in `clk-stm32mp25`, Linux's RCC (Reset and Clock Control) driver.\n\nWithout this clock the SD controller cannot work, and the root filesystem is on that card."},
+    {"anchor": ["the gate's parent is flexgen_51", "rect:360,305,240,55"], "title": "2-3. The parent clock is an SCMI clock, so Linux asks for it first",
+     "body": "The gate `ck_ker_sdmmc1` has parent `flexgen_51`, which is an SCMI clock. The framework enables the parent first with `clk_enable(parent)`, which reaches `scmi_clk_enable()` in `clk-scmi`.\n\nLinux can only manage gates and dividers below clocks the secure world owns."},
+    {"anchor": "SCMI clock protocol 0x14", "pad": 12, "title": "4. The request becomes an SCMI message",
+     "body": "`clk-scmi` and `arm_scmi` build a message for clock protocol `0x14` using `CLOCK_CONFIG_SET` (`0x7`) with the enable setting.\n\nThe message names a protocol, a message id and parameters, and the reply carries a status."},
+    {"anchor": "rect:585,428,240,56", "title": "5. The message crosses to the secure world as an smc",
+     "body": "The transport is an `smc` with `OPTEE_SMC_CALL_WITH_ARG`, which carries a call to the PTA-SCMI pseudo trusted application, command 1, `PROCESS_SMT_CHANNEL`. A pseudo trusted application is a service built into OP-TEE itself.\n\nThe `smc` instruction traps to EL3, so BL31 receives it first."},
+    {"anchor": ["rect:815,494,240,55", "pta/scmi.c → scmi_server"], "pad": 12, "title": "6-7. BL31 enters S-EL1 and the SCMI server decodes the message",
+     "body": "BL31's `opteed_smc_handler` saves the normal-world context and does an ERET (exception return) into S-EL1, where OP-TEE runs. In OP-TEE, `pta/scmi.c` passes the message to `scmi_server`, and `scmi_clock` maps it to `optee_clock`.\n\nBL31 only forwards; it does not understand the clock message."},
+    {"anchor": "rect:1045,628,240,48", "title": "8. OP-TEE enables the generator in the clock hardware",
+     "body": "OP-TEE uses its own secure-world access to the RCC to enable the flexgen output.\n\nNormal-world code cannot do this itself, which is the point: the root and bus clocks are owned by the secure side."},
+    {"anchor": "rect:125,676,925,140", "title": "The status travels back the same way",
+     "body": "OP-TEE puts the status in the shared buffer and returns from the `smc`. BL31 returns to NS-EL1 (non-secure EL1), `clk-scmi` returns 0, and the RCC driver finally sets its own gate bit.\n\nOnly then does the probe go on."},
+    {"anchor": "arch/arm64/boot/dts/st/stm32mp251.dtsi (abridged)", "up": 1, "title": "The device tree wires Linux to OP-TEE",
+     "body": "The `optee` node uses `method = \"smc\"`. The `scmi` node with `compatible = \"linaro,scmi-optee\"` offers protocols `0x14` (clocks), `0x16` (resets) and `0x17` (voltage domains).\n\nWithout the `scmi` node Linux would have no clock provider for these roots."},
+    {"anchor": "Why does a clock need a round trip?", "up": 1, "title": "Takeaway: the secure world owns the roots of the clock tree",
+     "body": "HSE, HSI, the ICN bus clocks and the FLEXGEN outputs are owned by OP-TEE. The `rcc` node lists them as inputs from `scmi_clk`, and Linux manages only the gates and dividers below them.\n\nThe same ideas are drawn for the i.MX 8M Plus in the diagrams **What happens on an smc** (`smc-flow`) and **How TrustZone is enforced** (`trustzone`)."}
+  ]
+}

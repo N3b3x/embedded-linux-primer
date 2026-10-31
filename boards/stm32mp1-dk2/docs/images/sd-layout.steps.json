@@ -1,0 +1,52 @@
+{
+  "title": "The SD card, byte for byte",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "One GPT disk, five partitions",
+      "body": "The top bar shows the first 18 MiB to scale. The ROM and BL2 do not read at fixed offsets: they look partitions up in the GPT by name and type, so we are free to choose where they sit. The cards below say who reads each one."
+    },
+    {
+      "anchor": "1  fsbl1",
+      "title": "fsbl1: where the Boot ROM finds BL2",
+      "body": "The ROM looks for a partition **named** `fsbl1` and copies the file in it into SYSRAM. The file is `tf-a-stm32mp157f-dk2.stm32`, BL2 with its STM32 header, 209,316 bytes in this build, in a 256 KiB partition.\n\nThe 64-bit board calls this partition `fsbla1`; here it is `fsbl1`.",
+      "up": 1
+    },
+    {
+      "anchor": "2  fsbl2",
+      "title": "fsbl2: the same BL2 again",
+      "body": "If the first copy is damaged the ROM falls back to `fsbl2`. `image.sh` writes the same file into both, so a failed update cannot leave the board unbootable.",
+      "up": 1
+    },
+    {
+      "anchor": "3  fip",
+      "title": "fip: everything BL2 loads",
+      "body": "BL2 finds this partition by its **type GUID** `19D5DF83-…` (or, failing that, by the name `fip`). It holds `fip.bin`: OP-TEE in three files, U-Boot and two device trees, 1.65 MB in a 4 MiB partition.\n\nNo metadata or A/B partitions are needed: TF-A is built without its firmware-update feature, and without it BL2 uses exactly this lookup (`plat/st/common/bl2_io_storage.c`).",
+      "up": 1
+    },
+    {
+      "anchor": "4  u-boot-env",
+      "title": "u-boot-env: where U-Boot saves its variables",
+      "body": "U-Boot's device tree names this partition (`u-boot,mmc-env-partition`) and keeps two copies of its environment at the end of it. Fresh images leave it empty, and `flash.sh` wipes it on a reused card so old settings cannot survive.",
+      "up": 1
+    },
+    {
+      "anchor": "5  rootfs",
+      "title": "rootfs: U-Boot, then Linux",
+      "body": "The big ext4 partition. It carries the **bootable flag** (GPT attribute bit 2), which is what makes U-Boot scan it first, and its PARTUUID is the one the kernel command line names in `root=PARTUUID=…`.\n\nEverything the kernel needs is inside: `/boot/zImage`, the device tree, `extlinux.conf`, and the distribution.",
+      "up": 1
+    },
+    {
+      "anchor": "/boot/extlinux/extlinux.conf (written by image.sh)",
+      "title": "extlinux.conf: the one file U-Boot reads",
+      "body": "`LINUX` and `FDT` name the kernel and device tree on this partition. `APPEND` is the kernel command line: the root by PARTUUID, the console `ttySTM0,115200`, `rootwait` (wait for the card), `rw` and `earlycon` (messages from the first moment).\n\nA second entry, `linux-debug`, adds `loglevel=7` and a deferred-probe report.",
+      "up": 1
+    },
+    {
+      "anchor": "Why these rules",
+      "title": "Why each rule exists",
+      "body": "The ROM wants a name, BL2 wants a type GUID or a name, U-Boot wants the bootable flag, and Linux wants a PARTUUID so it does not matter whether the card is `mmcblk0` or `mmcblk1`.",
+      "up": 1
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "title": "What is on the SD card",
+  "steps": [
+    {"anchor": null, "title": "A GPT disk where programs find their part by name",
+     "body": "The card carries a GPT (GUID Partition Table) written by `scripts/image.sh`. The strip at the top shows the first 18 MiB to scale, the five cards show each partition, and the bottom shows what is inside `rootfs`.\n\nThe Boot ROM and BL2 look partitions up by NAME and TYPE GUID, never by position, so the offsets are ours to choose."},
+    {"anchor": "rect:40,148,1320,66", "title": "Most of the early disk is empty",
+     "body": "From the left: the GPT itself, the two small `fsbla` partitions just after 1 MiB, the 4 MiB `fip` partition ending at 5.5 MiB, `u-boot-env` at 9 MiB, and `rootfs` from 16 MiB to the end of the card.\n\nThe gaps marked unused hold nothing. Because the ROM and BL2 look partitions up by name and type, the offsets are only a choice made by `scripts/image.sh`."},
+    {"anchor": ["1  fsbla1", "2  fsbla2"], "title": "fsbla1 and fsbla2 hold two copies of BL2",
+     "body": "Each is 256 KiB and holds `tf-a-stm32mp257f-dk.stm32` (BL2, 175,080 bytes in this build), starting at sectors 2048 and 2560. The Boot ROM reads `fsbla1` and falls back to `fsbla2` when the first image is bad.\n\nIf neither is named correctly, the ROM has nothing to start and the board never boots from the card."},
+    {"anchor": "3  fip", "title": "fip holds everything BL2 loads next",
+     "body": "The 4 MiB partition at sector 3072 has TYPE GUID `19D5DF83-11B0-457B-BE2C-7559C13142A5` and holds `fip.bin`: BL31, OP-TEE, U-Boot, the DDR firmware and DTBs (2.0 MB in this build). A FIP is the packed firmware file.\n\nBL2 finds it by that GUID or by the name `fip`, so the partition can sit anywhere."},
+    {"anchor": "4  u-boot-env", "title": "u-boot-env keeps U-Boot's saved settings",
+     "body": "This 512 KiB partition at sector 18432 is read by U-Boot and holds the U-Boot environment, two copies at the end of the partition.\n\nU-Boot finds it by partition name (`u-boot,mmc-env-partition`); the raw offsets `0x900000` and `0x940000` are only a fallback."},
+    {"anchor": "5  rootfs", "title": "rootfs is the only partition Linux uses",
+     "body": "The ext4 partition (label `rootfs`) starts at sector 32768 and takes the rest of the card. U-Boot reads the kernel from it, then Linux mounts it as `/`.\n\nIt is the only partition with the GPT 'bootable' flag, which is how U-Boot knows where to look."},
+    {"anchor": "ext4, label \"rootfs\", PARTUUID 6d70326b-…-000000000001", "up": 1, "title": "The kernel and its device tree live inside rootfs",
+     "body": "`/boot/Image` is the kernel, `/boot/stm32mp257f-dk-primer.dtb` its device tree, and `/lib/modules/6.18.58-custom/…` holds the drivers built as modules. The rest is the distribution (`/sbin/init`, `/usr`, `/home`).\n\nThe PARTUUID is the partition's unique ID, which the kernel command line uses to find the root."},
+    {"anchor": "/boot/extlinux/extlinux.conf (written by image.sh)", "up": 1, "title": "extlinux.conf tells U-Boot what to start",
+     "body": "U-Boot reads this small file: `LINUX` names the kernel, `FDT` the device tree, and `APPEND` the kernel command line. That line has `root=PARTUUID=…`, `console=ttySTM0,115200`, `rootwait` (wait for the SD card to appear) and `rw` (mount read-write).\n\nWithout the file U-Boot finds nothing to boot."},
+    {"anchor": "Why these rules", "up": 1, "title": "Takeaway: each stage finds its part in a different way",
+     "body": "The ROM looks for the partition named `fsbla1`, then `fsbla2`. BL2 looks for the FIP TYPE GUID, or the name `fip`. U-Boot scans the partition with the 'bootable' flag (GPT attribute bit 2) first.\n\nLinux uses `root=PARTUUID=…`, which finds `rootfs` on any `mmcblk` number: the SD card is not always `mmcblk0`."}
+  ]
+}

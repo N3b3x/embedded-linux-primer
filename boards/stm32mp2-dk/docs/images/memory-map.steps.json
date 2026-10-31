@@ -1,0 +1,23 @@
+{
+  "title": "Where things live in memory during boot",
+  "steps": [
+    {"anchor": null, "title": "Two memories: a tiny on-chip one and the big DDR",
+     "body": "Boot uses two address ranges. On the left is SYSRAM, 256 KiB of on-chip RAM from `0x0E000000`, which works from power-on and holds BL2 and BL31. On the right is the 4 GiB of LPDDR4 starting at `0x8000_0000`, which only works after BL2 trains it.\n\nEach card gives a name, its start address and why that address was chosen. The DDR side is not drawn to scale."},
+    {"anchor": "BL2 image", "title": "BL2 runs from SYSRAM at 0x0E017000",
+     "body": "In this build BL2 occupies `0x0E017000` to `0x0E02CFE8`, about 90 KB of code and data. The Boot ROM first copies the `.stm32` payload (174,568 bytes) to `0x0E002600` and jumps in.\n\nBL2 is the stage that makes DDR usable, so it has to live in memory that already works."},
+    {"anchor": "BL2 device tree", "title": "BL2 carries its own small device tree",
+     "body": "A DTB (compiled device tree, a description of the hardware) of 24 KiB is reserved at `0x0E011000`. It tells BL2 about clocks, DDR and which storage to read.\n\nThis is BL2's own file, separate from U-Boot's and the kernel's."},
+    {"anchor": "SRAM1: DDR PHY firmware", "title": "The DDR training code sits in SRAM1 first",
+     "body": "`lpddr4_pmu_train.bin` is copied to `0x0E040000` and then loaded into the DDR PHY (the circuit that talks to the memory chips), per `STM32MP_DDR_FW_BASE`.\n\nIt must go through on-chip RAM because DDR is exactly what is not working yet."},
+    {"anchor": "BL31 (+ fw-config while BL2 runs)", "title": "BL31 owns the bottom of SYSRAM for good",
+     "body": "BL31 is loaded at `0x0E000000`, the start of SYSRAM, with 92 KiB left for it below BL2 (`STM32MP_BL31_SIZE`). While BL2 runs, `fw-config` (its load plan) is also read to the same start address.\n\nBL31 stays here for the whole life of the system."},
+    {"anchor": ["OP-TEE (TZDRAM)", "reserved by the kernel DT"], "title": "OP-TEE gets 32 MiB of DDR that Linux must not touch",
+     "body": "OP-TEE sits at `0x82000000`, 32 MiB (`CFG_TZDRAM_START` and size `0x02000000`), marked secure and firewalled by RISAF (a hardware memory firewall).\n\nThe kernel device tree also reserves `fw@80000000`, 64 MiB with `no-map`, so Linux never uses `0x80000000` to `0x83FFFFFF`. That range covers OP-TEE."},
+    {"anchor": ["U-Boot as loaded (BL33)", "U-Boot's DTB (hw-config)"], "title": "U-Boot and its device tree are loaded next to each other",
+     "body": "`u-boot-nodtb.bin` is loaded at `0x84000000`, up to 4 MiB (`STM32MP_BL33_MAX_SIZE`). U-Boot then relocates itself to the top of DDR, and `0x84000000` is also `kernel_comp_addr_r`.\n\nBL2 puts `u-boot.dtb` at `0x84400000` (up to 256 KiB), which U-Boot reads at start."},
+    {"anchor": ["kernel_addr_r…ramdisk_addr_r", "free DDR"], "title": "U-Boot picks load addresses for the kernel; Linux gets the rest",
+     "body": "U-Boot loads the `Image` at `0x8A000000` and the DTB at `0x90000000` (`fdt_addr_r`). The script goes to `0x90100000`, the `extlinux.conf` text to `0x90200000`, overlays to `0x90300000` and a ramdisk to `0x90400000`.\n\nAfter `booti` the kernel runs from here and owns all DDR that is not reserved."},
+    {"anchor": "where the numbers come from", "title": "Takeaway: every address traces to one definition",
+     "body": "`DDR_BASE` is `0x80000000`. `BL33_BASE` is `DDR_BASE + 0x04000000 = 0x84000000` with `BL33_MAX_SIZE` `0x400000`, and `HW_CONFIG_BASE` follows at `0x84400000`.\n\nOP-TEE's address comes from `fdts/stm32mp257f-dk-ca35tdcid-fw-config.dtsi`. `BL33_BASE` and `HW_CONFIG_BASE` are computed from `DDR_BASE`, so they follow it."}
+  ]
+}

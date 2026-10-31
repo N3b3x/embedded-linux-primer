@@ -1,0 +1,24 @@
+# Everything the build scripts generate, in every board directory
+build/
+
+# Personal overrides (see each board's config/*.conf)
+config/local.conf
+
+# Python bytecode from the diagram generators
+__pycache__/
+*.pyc
+
+# Fetched at site build time by tools/release/fetch-releases.py
+site/assets/releases.json
+
+# Editor / OS clutter
+*.swp
+*~
+.vscode/
+.idea/
+.DS_Store
+
+# Local tool configuration (per developer)
+.claude/
+CLAUDE.md
+CLAUDE.local.md

@@ -1,0 +1,57 @@
+{
+  "title": "What ./build.sh all does",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "Pinned sources in, one SD image out",
+      "body": "Read left to right: fetched sources, build steps, artifacts, then assembly into `sdcard.img`.\n\nEvery box maps to a command you can run alone, or print with `--dry-run`."
+    },
+    {
+      "anchor": "Arm GNU Toolchain 14.3",
+      "title": "Fetched once, pinned and verified",
+      "body": "The cross-compiler (a compiler that runs on your PC and produces ARM64 code), NXP firmware, and four Git repositories are fetched at fixed versions, with sha256 checks. This makes two builds identical.",
+      "up": 1
+    },
+    {
+      "anchor": "./build.sh uboot",
+      "title": "Four steps build the boot container",
+      "body": "The steps are firmware, `atf`, `uboot` and `mkimage`. They produce the DDR firmware, `bl31.bin`, U-Boot with DTBs, and finally `flash.bin`, which combines SPL, DDR firmware, BL31 and U-Boot.",
+      "up": 1
+    },
+    {
+      "anchor": "./build.sh kernel",
+      "title": "The kernel step",
+      "body": "It builds `Image.gz`, the device trees and the modules from `imx8_var_defconfig`, then installs them into a tarball. Wrong kernel config means missing drivers.",
+      "up": 1
+    },
+    {
+      "anchor": "./build.sh rootfs",
+      "title": "The rootfs step",
+      "body": "It builds Debian 13 with `mmdebstrap` or Alpine from its minirootfs, with this repository's customizations. This is the operating system around the kernel.",
+      "up": 1
+    },
+    {
+      "anchor": "imx-boot.bin",
+      "title": "Three artifacts",
+      "body": "The build produces `imx-boot.bin` (1.7 MB), `kernel.tar.gz` and `rootfs.tar` in `build/deploy/`. Each is independent so you can rebuild one without the others.",
+      "up": 1
+    },
+    {
+      "anchor": "./build.sh image   (scripts/image.sh)",
+      "title": "Assemble without root",
+      "body": "The image step extracts the tarballs into a staging directory, creates the ext4 filesystem with `mke2fs -d`, makes a partition table and `dd`s the boot container at 32 KiB and the filesystem at 8 MiB.\n\nUsing `fakeroot` means no sudo, loop devices or mounts.",
+      "up": 1
+    },
+    {
+      "anchor": "build/deploy/sdcard.img",
+      "title": "The layout on the card",
+      "body": "The image is MBR, then `imx-boot.bin` at 32 KiB, the U-Boot environment at 7 MiB and partition p1 at 8 MiB. Flash it with `./build.sh flash -d /dev/sdX --expand`.",
+      "up": 1
+    },
+    {
+      "anchor": "Re-runs skip what is done: an unchanged ./build.sh all takes ~30 s; the first run ~25 min (12 cores).",
+      "title": "Takeaway: incremental and reproducible",
+      "body": "Everything generated lives in `build/`. The first run takes about 25 minutes, and unchanged re-runs about 30 seconds."
+    }
+  ]
+}

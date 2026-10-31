@@ -1,0 +1,23 @@
+{
+  "title": "The customization ladder",
+  "steps": [
+    {"anchor": null, "title": "Climb only as high as the job needs",
+     "body": "The nine rungs run from the cheapest change to the most dangerous. For each one the table gives an example, where it lives in the repository, the rebuild time, how it fails and the way back.\n\nThe rule: use the lowest-numbered rung that can do the job."},
+    {"anchor": "Application / service", "up": 1, "title": "Rung 1: your program is the safest change",
+     "body": "A hook in `scripts/rootfs/` runs your program at boot. A rebuild takes seconds, a failure is a failed service, and the way back is to edit and reboot."},
+    {"anchor": "Root filesystem", "up": 1, "title": "Rung 2: packages, users and config files",
+     "body": "Add a package, a user or a file through `scripts/rootfs/` and the package lists. It takes a minute to rebuild.\n\nIf you break it, you may get no login and must re-flash the rootfs."},
+    {"anchor": ["Device tree", "Kernel config"], "up": 1, "title": "Rungs 3 and 4: hardware description and kernel options",
+     "body": "A device tree change (`custom/dts/`) enables a UART or I2C sensor in seconds; the way back is to boot the old `.dtb`. A kernel config fragment (`config/kernel/*.cfg`) enables a driver or feature in minutes with ccache.\n\nA bad kernel config can mean no boot or a missing device, fixed by re-flashing `/boot`."},
+    {"anchor": "Kernel patch", "up": 1, "title": "Rung 5: kernel patches change code",
+     "body": "A patch in `patches/kernel/` fixes or adds driver code and takes minutes to rebuild. Mistakes cause an oops or no boot.\n\nRe-flash `/boot` to go back."},
+    {"anchor": "Bootloader environment", "up": 1, "title": "Rung 6: bootloader environment",
+     "body": "Boot order, console and kernel args live in `uEnv.txt`, `extlinux.conf` or the environment. It takes effect in seconds.\n\nThe failure is \"no kernel found\", fixed at the U-Boot prompt."},
+    {"anchor": ["Bootloader patch / config", "Secure firmware"], "up": 1, "title": "Rungs 7 and 8: the boot chain itself",
+     "body": "Bootloader patches (`patches/uboot/`, defconfig) can leave the board stopping at the ROM. Secure firmware (`patches/atf/`, optee) can leave **no serial output at all**.\n\nBoth need another medium or USB boot to recover."},
+    {"anchor": "Boot ROM, fuses", "up": 1, "title": "Rung 9: fuses cannot be undone",
+     "body": "Locking the board to signed images uses vendor tools and is not in this repository. Fuses are one-time, so a mistake means a bricked board, forever."},
+    {"anchor": "Rung 1 is the cheapest to try, rung 9 cannot be undone. Rule of thumb: use the lowest-numbered rung that can do the job.", "title": "Takeaway: lowest rung that works",
+     "body": "Every board directory has the same folders for these rungs (see `docs/board-contract.md`), so the answer to \"where does this go?\" is the same on every board."}
+  ]
+}

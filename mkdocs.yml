@@ -1,0 +1,117 @@
+# Site configuration for the documentation site.
+#
+# Do not run `mkdocs` on this file directly: the Markdown lives in several places (docs/, boards/*)
+# and is assembled, with links rewritten, by tools/build-site.py, which then builds the site with a
+# generated config in build/ that inherits everything below and adds the navigation.
+#
+#   python3 tools/build-site.py --serve       live preview at http://127.0.0.1:8000
+#   python3 tools/build-site.py --strict      the build CI runs (any warning fails)
+site_name: Embedded Linux Primer
+site_description: Build the whole software stack of an embedded Linux board from source, one small board directory at a time.
+site_url: https://n3b3x.github.io/embedded-linux-primer/
+repo_url: https://github.com/N3b3x/embedded-linux-primer
+repo_name: embedded-linux-primer
+edit_uri: ""
+copyright: Copyright &copy; 2026 Nebiyu Tadesse.
+docs_dir: site-src
+site_dir: site-out
+
+theme:
+  name: material
+  logo: assets/logo.svg
+  favicon: assets/logo.svg
+  language: en
+  palette:
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: teal
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: teal
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+  # system fonts: no request to a third-party font service from an internal site
+  font: false
+  icon:
+    repo: fontawesome/brands/github
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - navigation.tracking
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - toc.follow
+
+plugins:
+  - search
+  - minify:
+      minify_html: true
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.betterem
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+extra_css:
+  - stylesheets/extra.css
+  - stylesheets/diagrams.css
+  - stylesheets/downloads.css
+
+extra_javascript:
+  - javascripts/diagrams.js
+  - javascripts/explorer.js
+  - javascripts/downloads.js
+
+validation:
+  omitted_files: info
+  absolute_links: info
+  unrecognized_links: warn
+  anchors: warn
+
+extra:
+  generator: false
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/N3b3x/embedded-linux-primer

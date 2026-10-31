@@ -1,0 +1,91 @@
+{
+ "title": "Where your changes go",
+ "steps": [
+  {
+   "anchor": null,
+   "title": "Find your change, read across the row",
+   "body": "Each row starts with what you want to change and reads left to right: the file to edit, how to edit it, the command to re-run, and the part of the board that is rewritten.\n\nThe colours group the changes: green for the kernel, purple for the device tree, root filesystem and account, blue for UEFI, orange for your own carrier board."
+  },
+  {
+   "anchor": [
+    "a kernel option",
+    "config/kernel/my.cfg",
+    "CONFIG_FOO=y, one per line",
+    "a driver or kernel",
+    "patches/source/0001-….patch",
+    "patch -p1, relative to"
+   ],
+   "title": "Kernel options and source changes both end in ./build.sh kernel",
+   "body": "A kernel option is one line such as `CONFIG_FOO=y` in `config/kernel/my.cfg`, applied on top of the default kernel configuration. A driver or kernel source change is a file `patches/source/0001-….patch`, applied with `patch -p1` relative to `build/work/Linux_for_Tegra/source`.\n\nBoth run `./build.sh kernel`, and the result in `kernel/Image` and the modules lands in the `kernel` partition and in `APP`."
+  },
+  {
+   "anchor": [
+    "a device tree node",
+    "patches/source/0002-….patch",
+    "files under source/hardware/"
+   ],
+   "title": "A device tree change is a patch too, but lands elsewhere",
+   "body": "Device tree edits are patches to files under `source/hardware/nvidia/t23x/nv-public/…`, built by `./build.sh kernel`. The device tree is the data file that tells the kernel what hardware exists.\n\nThe output is `kernel/dtb/*.dtb`, which goes to the `kernel-dtb` partition only, not to the root filesystem."
+  },
+  {
+   "anchor": [
+    "which DTB the kernel",
+    "rootfs/boot/extlinux/",
+    "add an FDT /boot/….dtb line",
+    "./build.sh image"
+   ],
+   "title": "Choosing the DTB is an extlinux.conf edit",
+   "body": "To make the kernel boot with a different device tree, add an `FDT /boot/….dtb` line to `rootfs/boot/extlinux/extlinux.conf`. NVIDIA calls this 'DTB Support'.\n\nRun `./build.sh image`. The change lands in `APP:/boot/extlinux/`, in the root filesystem."
+  },
+  {
+   "anchor": [
+    "UEFI boot order",
+    "ROOT_DEVICE, BOOT_ORDER_OVERLAY",
+    "QSPI-NOR (UEFI variables)"
+   ],
+   "title": "UEFI boot order changes the firmware flash",
+   "body": "Boot order and boot mode are set with config variables (`ROOT_DEVICE`, `BOOT_ORDER_OVERLAY`) or by editing `kernel/dtb/L4TConfiguration.dtbo`, converting with `dtc -I dtb -O dts` and back.\n\nThis is the one row that needs `./build.sh image` and `./build.sh flash`, because UEFI variables live in QSPI-NOR, so the board must be in recovery mode again."
+  },
+  {
+   "anchor": [
+    "hostname, user,",
+    "config/local.conf",
+    "TARGET_HOSTNAME, TARGET_USER,",
+    "clean, rootfs, image"
+   ],
+   "title": "Hostname, user and password live in local.conf",
+   "body": "Set `TARGET_HOSTNAME`, `TARGET_USER` and `TARGET_PASSWORD` in `config/local.conf`, then run `clean`, `rootfs` and `image` so the account is created again.\n\nThe result is files under `rootfs/etc/…`, written into the `APP` partition."
+  },
+  {
+   "anchor": [
+    "packages, files,",
+    "build/work/Linux_for_Tegra/",
+    "sudo chroot (qemu) or copy"
+   ],
+   "title": "Packages and files go into rootfs/ as root",
+   "body": "Edit the tree at `build/work/Linux_for_Tegra/rootfs/` with `sudo chroot` (using qemu to run arm64 binaries on the x86-64 PC) or copy files in as root, because the tree's files are owned by root.\n\nThen `./build.sh image` packs it into the `APP` root filesystem."
+  },
+  {
+   "anchor": [
+    "pinmux, pad voltage",
+    "a copy of the board .conf",
+    "new BOARD name, new MB1-BCT",
+    "BOARD=… ./build.sh"
+   ],
+   "title": "Your own carrier board means new boot firmware",
+   "body": "Pinmux and pad voltage settings are read by MB1, so they live in its BCT. Copy the board `.conf` and edit `bootloader/generic/BCT/*.dtsi` for a new `BOARD` name and a new MB1-BCT (see docs/08 section 6).\n\nRun `BOARD=… ./build.sh image && flash`. The change lands in QSPI-NOR, in both the A and B boot firmware."
+  },
+  {
+   "anchor": "Fast loop for kernel work",
+   "up": 1,
+   "title": "For kernel work, skip the flash",
+   "body": "In the default boot mode the kernel comes from the root filesystem (`/boot/Image`, selected by `/boot/extlinux/extlinux.conf`).\n\nSo on a running board you can `scp` the new Image and modules, keep the old kernel as a second extlinux entry and reboot. No recovery mode is needed, and the old entry is your way back."
+  },
+  {
+   "anchor": "Exact commands for each row",
+   "pad": 10,
+   "title": "Anything that touches boot firmware needs recovery mode",
+   "body": "A change that lands in 'boot firmware' rewrites the QSPI-NOR flash, which needs recovery mode again. Rows that land in the kernel, DTB or `APP` leave the firmware alone.\n\nExact commands for every row are in `docs/08-customizing.md`."
+  }
+ ]
+}

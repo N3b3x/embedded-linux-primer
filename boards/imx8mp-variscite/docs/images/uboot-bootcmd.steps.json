@@ -1,0 +1,61 @@
+{
+  "title": "How U-Boot finds and starts Linux",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "A chain of environment variables",
+      "body": "U-Boot's boot is not hard-coded: `bootcmd` runs `bsp_bootcmd`, which runs a series of variables. The left column is the flow; the right column shows this board's real boot log for each step.\n\nEvery step can be printed, changed or overridden from `/boot/uEnv.txt`."
+    },
+    {
+      "anchor": "Hit any key to stop autoboot: 1 s",
+      "title": "A one-second window to interrupt",
+      "body": "`bootdelay=1` gives you one second to press a key and get the `u-boot=>` prompt before `bootcmd` runs. You need the serial console connected to use it.",
+      "up": 1
+    },
+    {
+      "anchor": "mmc dev ${mmcdev}; mmc rescan",
+      "title": "Pick the device it booted from",
+      "body": "`mmcdev` is the MMC device number U-Boot booted from: 1 for the SD card, 2 for the eMMC. The log shows `mmc1 is current device`, meaning the SD card.",
+      "up": 1
+    },
+    {
+      "anchor": [
+        "/boot/boot.scr exists?",
+        "/boot/uEnv.txt exists?"
+      ],
+      "title": "Two optional override files",
+      "body": "If `/boot/boot.scr` exists, U-Boot sources it and the script decides everything. Otherwise it imports `/boot/uEnv.txt` to override variables and continues.\n\nThe log lines `Failed to load` for both are normal, since neither file exists by default.",
+      "up": 1
+    },
+    {
+      "anchor": "loadimage",
+      "title": "Load and unpack the kernel",
+      "body": "`loadimage` reads `/boot/Image.gz` from partition 1 into `${img_addr}` and unzips it to `${loadaddr}`. The log shows 15,647,614 bytes read and an uncompressed size of 35,887,616.\n\nIf that fails, U-Boot falls back to netboot: DHCP, then TFTP.",
+      "up": 1
+    },
+    {
+      "anchor": "ramsize_check → cma_size",
+      "title": "Size the CMA pool from RAM",
+      "body": "CMA (contiguous memory allocator) is memory the kernel reserves for devices such as the GPU and camera. The size depends on RAM: 64M up to 512 MiB, 320M to 1 GiB, 384M to 2 GiB, else 704M.\n\nThis board has 4 GiB, so it gets `cma=704M`.",
+      "up": 1
+    },
+    {
+      "anchor": "mmcargs + optargs → bootargs",
+      "title": "Build the kernel command line",
+      "body": "These variables assemble `bootargs`, the text passed to Linux: `console=ttymxc1,115200 root=/dev/mmcblk1p1 rootwait rw cma=704M`. Wrong `root=` and the kernel cannot mount its root filesystem and stops.",
+      "up": 1
+    },
+    {
+      "anchor": "findfdt → ${fdt_file}",
+      "title": "Derive the device-tree name",
+      "body": "U-Boot builds the DTB file name from the module (read from EEPROM), its revision and the carrier board. Here it gives `imx8mp-var-som-1.x-symphony.dtb`.\n\nA wrong name means the kernel gets no or the wrong hardware description.",
+      "up": 1
+    },
+    {
+      "anchor": "booti ${loadaddr} - ${fdt_addr}",
+      "title": "Jump into the kernel",
+      "body": "`loadfdt` reads the DTB and `booti` starts the kernel, passing the DTB address. The log ends in `Starting kernel ...` and U-Boot is gone from memory.",
+      "up": 1
+    }
+  ]
+}

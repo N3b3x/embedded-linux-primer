@@ -1,0 +1,23 @@
+{
+  "title": "What ./build.sh all does",
+  "steps": [
+    {"anchor": null, "title": "Sources go in on the left, one SD card image comes out on the right",
+     "body": "The diagram has four columns: pinned **sources**, the **steps** of `./build.sh`, the **artifacts** each step leaves in `build/deploy/`, and the **result**.\n\nEach step also runs alone, so a change to one component only redoes that component. Colours match the other diagrams: rose is the secure world, blue is boot stages, teal is Linux, amber is firmware blobs."},
+    {"anchor": ["stm32-ddr-phy-binary", "Debian trixie / Alpine 3.24"], "title": "Every input is pinned to an exact version",
+     "body": "The source cards name an exact version or git commit, for example U-Boot v2026.07 at `ece349ad`, TF-A v2.15.0 at `da738d5e`, OP-TEE 4.11.0 and Linux 6.18.58.\n\nPinning makes the build repeatable: the same commands today and next year give the same firmware. Without it a newer upstream release could silently change the result."},
+    {"anchor": "Arm GNU Toolchain 14.3 (sha256-pinned): aarch64-none-elf for TF-A and the OP-TEE core (no OS), aarch64-none-linux-gnu for the kernel and U-Boot. Source trees are checked out once into build/src/ and left alone.", "exact": true, "pad": 14, "title": "Two pinned Arm compilers do the building",
+     "body": "The Arm GNU Toolchain 14.3 is checked against a sha256 hash. `aarch64-none-elf` builds code that runs without an operating system (TF-A and the OP-TEE core); `aarch64-none-linux-gnu` builds the kernel and U-Boot.\n\nSource trees are cloned once into `build/src/` and left alone on later runs."},
+    {"anchor": ["./build.sh firmware ddr", "./build.sh firmware tfa"], "title": "Four steps build the firmware pieces",
+     "body": "`firmware ddr` only clones the LPDDR4 training firmware. `firmware optee` runs `make PLATFORM=stm32mp2` and includes the SCMI server from SCP-firmware (Arm's system control firmware), giving `tee-header_v2.bin` and `tee-pager_v2.bin`.\n\n`firmware uboot` uses `stm32mp25_defconfig` with `DEVICE_TREE=st/stm32mp257f-dk` and gives `u-boot-nodtb.bin` and `u-boot.dtb`. `firmware tfa` builds BL2 with its STM32 header plus BL31, as `tf-a-stm32mp257f-dk.stm32`."},
+    {"anchor": "(DDR firmware stays in src/)", "title": "The DDR training blob is not a deploy file",
+     "body": "`lpddr4_pmu_train.bin` stays in the cloned `stm32-ddr-phy-binary` repository under `src/` and is packed into the FIP (34,384 bytes there), so it has no file of its own in `build/deploy/`.\n\nBL2 needs it to train the LPDDR4 memory; without it the board cannot bring up main RAM."},
+    {"anchor": ["./build.sh firmware fip", "fip.bin"], "title": "The FIP step packs the firmware into one file",
+     "body": "`fiptool`, built from the same TF-A tree, packs BL31, OP-TEE, U-Boot, the DTBs and the DDR firmware into `fip.bin` (1,999,368 bytes here). FIP stands for Firmware Image Package.\n\nBL2 later loads each part from this single file, so the card needs just one partition for all of it."},
+    {"anchor": ["./build.sh kernel", "./build.sh rootfs"], "title": "Kernel and root filesystem are built separately",
+     "body": "`./build.sh kernel` turns the defconfig (plus `config/kernel/*.cfg`) into `Image`, 2 DTBs and modules, packed as `kernel.tar.gz`. `./build.sh rootfs` makes `rootfs.tar` with mmdebstrap (Debian trixie) or an Alpine 3.24 minirootfs.\n\nThey need none of the firmware, so they can be rebuilt on their own."},
+    {"anchor": "./build.sh image", "title": "The image step builds a disk without needing root",
+     "body": "Under fakeroot it makes an ext4 filesystem from rootfs plus kernel and adds `/boot/extlinux/extlinux.conf`. It then creates a GPT disk with 5 partitions using truncate and sfdisk, and writes BL2 to `fsbla1` and `fsbla2`, `fip.bin` to `fip` and the ext4 to `rootfs` with dd.\n\nFinally `bmaptool create` writes a `.bmap` file so flashing can skip empty blocks."},
+    {"anchor": "sdcard.img  (+ .bmap)", "title": "Takeaway: one file to flash",
+     "body": "The result is `sdcard.img` plus its `.bmap`, written to a card with `./build.sh flash -d /dev/sdX`.\n\nThe dry run, `./build.sh --dry-run all | less -R`, prints every command with the reason it exists, which is the quickest way to learn what each step does."}
+  ]
+}

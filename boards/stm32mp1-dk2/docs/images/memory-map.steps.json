@@ -1,0 +1,58 @@
+{
+  "title": "Where things live in memory during boot",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "Two address ranges",
+      "body": "On the left, the 256 KiB of on-chip SYSRAM that works before the main memory does. On the right, the 512 MiB of DDR3 that BL2 brings up. Addresses come from TF-A's `stm32mp1_def.h` and `stm32mp1_fip_def.h`, OP-TEE's `conf.mk` and U-Boot's `stm32mp15_common.h`."
+    },
+    {
+      "anchor": "BL2 image",
+      "title": "BL2 at 0x2FFE9000",
+      "body": "BL2 is linked to run from 88 KB just below the last page of SYSRAM. The Boot ROM copies the whole payload (device tree and BL2) into SYSRAM and jumps to the entry point named in the STM32 header.",
+      "up": 1
+    },
+    {
+      "anchor": "BL2 device tree",
+      "title": "BL2 has its own small device tree",
+      "body": "28 KiB are reserved just below BL2 for its DTB: the clock, DDR and PMIC description of this board.",
+      "up": 1
+    },
+    {
+      "anchor": "OP-TEE header + pager",
+      "title": "OP-TEE's first part sits at the bottom of SYSRAM",
+      "body": "BL2 loads the header and the pager image to `STM32MP_OPTEE_BASE`, the first byte of SYSRAM. When OP-TEE starts it owns the whole 256 KiB and pages the rest of itself in from secure DDR.",
+      "up": 1
+    },
+    {
+      "anchor": "Last page: non-secure, fw-config",
+      "title": "The last page is non-secure",
+      "body": "The last 4 KiB of SYSRAM is the non-secure page: BL2 reads the `fw-config` tree there, and TF-A's documentation calls it the SCMI mailbox. OP-TEE uses it for SCMI only when `CFG_STM32MP1_SCMI_SHM_SYSRAM` is on, which it is not by default.",
+      "up": 1
+    },
+    {
+      "anchor": "U-Boot as loaded (BL33)",
+      "title": "U-Boot at 0xC0100000",
+      "body": "BL2 puts U-Boot 1 MiB above the start of DDR; up to 4 MiB are reserved. After a few instructions U-Boot relocates itself to the top of non-secure memory.",
+      "up": 1
+    },
+    {
+      "anchor": "U-Boot's DTB (hw-config)",
+      "title": "U-Boot's DTB just after it",
+      "body": "`STM32MP_HW_CONFIG_BASE` is the end of U-Boot's reservation, `0xC0500000`.",
+      "up": 1
+    },
+    {
+      "anchor": "kernel_addr_r ... ramdisk_addr_r",
+      "title": "U-Boot's load addresses",
+      "body": "`sysboot` loads the kernel to `0xC2000000` and the device tree to `0xC4000000`. The script, extlinux and overlay buffers follow.",
+      "up": 1
+    },
+    {
+      "anchor": "OP-TEE secure RAM (TZDRAM)",
+      "title": "OP-TEE's 32 MiB at the top",
+      "body": "The top 32 MiB of the board's 512 MiB are secure, firewalled by the TZC-400, and reserved from Linux with `no-map` in the kernel's device tree.",
+      "up": 1
+    }
+  ]
+}

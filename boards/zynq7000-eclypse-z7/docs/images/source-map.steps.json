@@ -1,0 +1,64 @@
+{
+  "title": "The code that runs, power-on to /sbin/init",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "Open these files to follow the boot",
+      "body": "Four blocks, in boot order. Every path was checked against the pinned trees, and every row says in one line what the file does."
+    },
+    {
+      "anchor": "BootROM",
+      "title": "The ROM has no source here",
+      "body": "It is mask ROM inside the chip, described in chapter 6 of the Zynq-7000 technical reference manual (UG585). The rest of this map starts where its output begins: a file in on-chip RAM.",
+      "up": 1
+    },
+    {
+      "anchor": "arch/arm/mach-zynq/spl.c",
+      "title": "The SPL starts in board_init_f()",
+      "body": "`board_init_f()` calls `ps7_init()` before anything else; `spl_boot_device()` reads the SLCR boot-mode register and answers `BOOT_DEVICE_MMC1` for the SD card.",
+      "up": 1
+    },
+    {
+      "anchor": "board/xilinx/zynq/Makefile",
+      "title": "How our ps7 file gets compiled in",
+      "body": "When `CONFIG_XILINX_PS_INIT_FILE` is set the Makefile compiles that file as `ps_init_gpl.o` into the SPL. Without the option it looks for `board/xilinx/zynq/<device-tree-name>/ps7_init_gpl.c`, which is how the boards in the U-Boot tree do it.",
+      "up": 1
+    },
+    {
+      "anchor": "scripts/Makefile.xpl · tools/zynqimage.c",
+      "title": "Where BOOT.BIN is made",
+      "body": "`Makefile.xpl` runs `mkimage -T zynqimage` on the SPL binary; `zynqimage.c` writes the header the ROM reads. Read the comment at the top of that file for the layout.",
+      "up": 1
+    },
+    {
+      "anchor": "board/xilinx/zynq/board.c",
+      "title": "U-Boot proper learns where it booted from",
+      "body": "`board_late_init()` puts `mmc0` first in `boot_targets` when the boot-mode pins say SD, and `env_get_location()` puts the saved environment in a FAT file `uboot.env` on the same card.",
+      "up": 1
+    },
+    {
+      "anchor": "include/config_distro_bootcmd.h",
+      "title": "The distro boot script lives here",
+      "body": "`scan_dev_for_boot_part`, the `boot_prefixes` (`/` and `/boot/`) and `scan_dev_for_extlinux` are macros in this header; together they are why a plain `extlinux.conf` is enough.",
+      "up": 1
+    },
+    {
+      "anchor": "cmd/bootz.c",
+      "title": "The last U-Boot line",
+      "body": "`do_bootz()` passes the address of the device tree in register r2 and jumps to the zImage: the 32-bit ARM boot protocol.",
+      "up": 1
+    },
+    {
+      "anchor": "arch/arm/boot/dts/xilinx/zynq-7000.dtsi",
+      "title": "Linux describes the SoC in a shared file",
+      "body": "Our board file includes it; it declares both Cortex-A9 cores, the clock controller, `uart0`, `sdhci0`, `gem0` and the `devcfg` FPGA manager. The board file switches on what the board uses and adds the board-specific wiring.",
+      "up": 1
+    },
+    {
+      "anchor": "drivers/fpga/zynq-fpga.c",
+      "title": "The FPGA manager is built as a module",
+      "body": "It would load a PL bitstream; nothing calls it in this build, but it is the file to read before chapter 13.",
+      "up": 1
+    }
+  ]
+}

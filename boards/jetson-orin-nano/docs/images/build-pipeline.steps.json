@@ -1,0 +1,25 @@
+{
+  "title": "What ./build.sh all does",
+  "steps": [
+    {"anchor": null, "title": "NVIDIA's release goes in, a flash package comes out",
+     "body": "The build runs top to bottom in five stages: fetch, rootfs, kernel, image and flash. Everything lands in one NVIDIA-style directory tree.\n\nNo SD-card image is assembled. The result is a `Linux_for_Tegra/` tree plus the signed images that NVIDIA's tool generates from it."},
+    {"anchor": ["Driver package", "Sample root filesystem"], "up": 1, "title": "Two downloads are always needed",
+     "body": "`./build.sh fetch` downloads every file and verifies it against a pinned sha256. The driver package (715 MB, `Jetson_Linux_r36.4.3_aarch64.tbz2`) holds the flash tools, firmware binaries and a stock kernel.\n\nThe sample root filesystem (1.8 GB) is an Ubuntu 22.04 (jammy) arm64 userland. Without either one there is nothing to flash."},
+    {"anchor": ["Public sources", "Reference toolchain"], "up": 1, "title": "Two more downloads, only for your own kernel",
+     "body": "The dashed cards are optional. Public sources (226 MB) hold the kernel, NVIDIA modules and device trees. The reference toolchain (140 MB) is GCC 11.3 and runs on x86-64 only.\n\nIf you are happy with the stock kernel from the driver package, you can skip both."},
+    {"anchor": "./build.sh rootfs", "up": 1, "title": "rootfs builds the operating system tree",
+     "body": "It unpacks the sample rootfs with `sudo tar xpf`, keeping owners and permissions. `apply_binaries.sh` adds NVIDIA libraries, stock kernel modules, `extlinux.conf` and the initrd.\n\n`l4t_create_default_user.sh` creates the login account, so there is no first-boot wizard. These steps need root so that file ownership stays correct."},
+    {"anchor": "./build.sh kernel", "up": 1, "title": "kernel compiles your own kernel, modules and device trees",
+     "body": "It extracts the sources, applies `patches/source/*.patch`, runs `make defconfig` plus `config/kernel/*.cfg`, and builds `Image`, `dtbs` and modules. NVIDIA's out-of-tree modules are built separately.\n\nIt installs the results into `rootfs/lib/modules`, `kernel/Image` and `kernel/dtb/`, and rebuilds the initrd. This stage is optional."},
+    {"anchor": "./build.sh image", "up": 1, "title": "image runs NVIDIA's tool in no-flash mode",
+     "body": "`sudo l4t_initrd_flash.sh --no-flash` is given the QSPI layout (`flash_t234_qspi.xml`), the external-device layout (`flash_l4t_t234_nvme.xml`) and the board `jetson-orin-nano-devkit-super`. The root device may be nvme0n1p1, SD or USB.\n\nIt builds the signed QSPI images, the APP rootfs image and the flashing initrd, and stops without touching a board."},
+    {"anchor": "build/work/Linux_for_Tegra/", "up": 1, "title": "Linux_for_Tegra is the real build artifact",
+     "body": "NVIDIA's scripts only work from inside their own directory layout, so this tree is the product of the build.\n\nIt contains `rootfs/`, `kernel/Image` (flashed to the `kernel` partition), `kernel/dtb/` (device trees and UEFI overlays), `bootloader/` (the MB1, MB2, UEFI and other binaries), the board `.conf` with `flash.sh`, and `tools/kernel_flash/` with the generated images."},
+    {"anchor": "./build.sh flash", "up": 1, "title": "flash writes the package to the board in recovery mode",
+     "body": "`sudo l4t_initrd_flash.sh --flash-only --network usb0` boots a recovery initrd over USB and then writes everything. It needs the board in recovery mode.\n\nThe flash-flow diagram shows these steps one by one."},
+    {"anchor": "Jetson Orin Nano Developer Kit", "up": 1, "title": "Firmware goes to the module, the OS to your drive",
+     "body": "QSPI-NOR (64 MiB on the module) gets the boot firmware in two copies, A_ and B_. The SD card, NVMe or USB drive gets `kernel`, `kernel-dtb`, the ESP and `APP`, the root filesystem.\n\nSo the same package writes two different devices."},
+    {"anchor": "Steps run as your user except where sudo is shown", "pad": 10, "title": "Read it first with --dry-run",
+     "body": "Steps run as your user except where `sudo` is shown, because root-owned files must be created as root.\n\nEverything is explained command by command in `./build.sh --dry-run all`, which prints every command with its reason and runs nothing."}
+  ]
+}

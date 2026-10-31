@@ -1,0 +1,58 @@
+{
+  "title": "How the STM32MP157F-DK2 boots",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "Five stages, each one loads the next",
+      "body": "A processor cannot start a program as big as Linux straight from power-on, because its main RAM is not even working yet. So boot is a chain: each stage is small, prepares something, and loads the next one.\n\nRead the cards left to right. Red cards are the **secure world** (code the normal operating system cannot touch), blue cards are boot stages, teal is Linux. This is a 32-bit chip, so there is **no BL31**: OP-TEE is the secure monitor. The bars at the bottom show what is still in memory once Linux is up."
+    },
+    {
+      "anchor": "Boot ROM",
+      "title": "The Boot ROM is fixed in silicon and picks BL2",
+      "body": "The Boot ROM is code burned into the chip. It samples the BOOT pins to choose the medium, finds the GPT (the SD card's partition table) entry named `fsbl1`, checks the STM32 header and copies BL2 into SYSRAM, the chip's 256 KiB of on-chip RAM.\n\nNothing here can be configured or rebuilt, which is why the partition names on the card are not negotiable: with the wrong name the ROM finds nothing to load.",
+      "up": 1
+    },
+    {
+      "anchor": "TF-A BL2",
+      "title": "BL2 makes the big RAM work, then loads the rest",
+      "body": "BL2 is the second boot stage of TF-A (Trusted Firmware-A, Arm's reference secure firmware), running from SYSRAM `0x2FFE9000`.\n\nIt sets up the clocks, the PMIC (power chip) and the DDR3 controller (no separate firmware file is needed on this chip), programs the TZC-400 (hardware that restricts who may access which part of DDR), then reads the FIP (Firmware Image Package, one file holding the later stages) from the `fip` partition and loads OP-TEE and U-Boot.",
+      "up": 1
+    },
+    {
+      "anchor": "OP-TEE OS",
+      "title": "OP-TEE is the monitor, the trusted OS and the SCMI server",
+      "body": "OP-TEE runs in the secure world. Here it is three things at once: the secure monitor (it handles every `smc`, the instruction that crosses between worlds, and PSCI, the interface for turning CPUs on and off), a small trusted OS, and the SCMI server that Linux asks for clocks, resets and regulators.\n\nIt is loaded as three files (header, pager, pageable) and uses the top 32 MiB of DDR, `0xDE000000`.",
+      "up": 1
+    },
+    {
+      "anchor": "U-Boot",
+      "title": "U-Boot finds the kernel on the card",
+      "body": "U-Boot is the normal-world bootloader. Its default environment runs the generic *distro boot*: it scans the partition with the bootable flag for `/boot/extlinux/extlinux.conf`, loads `zImage` and the device tree it names into DDR (`0xC2000000` and `0xC4000000`), and starts the kernel with `bootz`.\n\nBL2 puts U-Boot at `0xC0100000`; it then relocates itself.",
+      "up": 1
+    },
+    {
+      "anchor": "Linux 6.18",
+      "title": "Linux brings up the board and asks OP-TEE for what it does not own",
+      "body": "The kernel decompresses itself, parses the device tree, probes drivers (serial `ttySTM0`, the SD controller, Ethernet) and mounts the root filesystem named by `root=PARTUUID=`. Because the device tree is the SCMI one, the SD card's supply and the clock roots come from OP-TEE.\n\nThen it runs `/sbin/init`, which starts a login on the serial console.",
+      "up": 1
+    },
+    {
+      "anchor": "WHO LOADS WHOM",
+      "title": "Who loads whom",
+      "body": "The ROM loads BL2. BL2 opens the FIP, found by its partition type GUID or by the name `fip`, and loads OP-TEE and U-Boot. BL2 then jumps to OP-TEE, which initialises and returns to the normal world at U-Boot's entry point.\n\nNo stage loads itself, and no stage after BL2 needs the ROM again.",
+      "up": 1
+    },
+    {
+      "anchor": "STILL IN MEMORY WHILE LINUX RUNS",
+      "title": "What stays resident",
+      "body": "BL2 and U-Boot are gone once Linux runs, and their memory is reused. OP-TEE stays: every `smc` still goes through it, and it keeps serving PSCI and SCMI.",
+      "up": 1
+    },
+    {
+      "anchor": "No BL31 and no DDR firmware on this chip: the DDR3 driver is part of BL2",
+      "title": "Takeaway: a shorter chain than the 64-bit board",
+      "body": "The 64-bit STM32MP257F-DK has two more boxes: a resident BL31 and a DDR training firmware blob. On this Cortex-A7 chip OP-TEE does the monitor's job and BL2 carries the DDR3 driver. The picture to remember: ROM, BL2, OP-TEE, U-Boot, Linux.",
+      "up": 1
+    }
+  ]
+}

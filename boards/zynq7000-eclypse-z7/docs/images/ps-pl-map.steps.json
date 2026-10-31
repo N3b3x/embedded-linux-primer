@@ -1,0 +1,58 @@
+{
+  "title": "The processing system and the programmable logic",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "One chip, two halves",
+      "body": "Left: the hard processing system, always present and the part everything in this repository uses. Right: the FPGA fabric, empty at power-on. Below: the AXI bus pair between them. The other boards of this repository have nothing like the right-hand half."
+    },
+    {
+      "anchor": "APU: 2 × Cortex-A9",
+      "title": "Two ordinary 32-bit CPU cores",
+      "body": "Cortex-A9, ARMv7 with NEON, up to 667 MHz on this speed grade. Linux sees two CPUs and an SMP kernel works as on any ARM board; the second core is released by kernel code through the SCU, not by PSCI firmware.",
+      "up": 1
+    },
+    {
+      "anchor": "L2 cache 512 KiB · OCM 256 KiB",
+      "title": "On-chip RAM is where it all starts",
+      "body": "The BootROM copies `BOOT.BIN` into the 256 KiB on-chip memory (OCM) because the DDR does not exist yet. The SPL runs from there until `ps7_init` has made DDR usable.",
+      "up": 1
+    },
+    {
+      "anchor": "DDR3/3L memory controller",
+      "title": "The DDR controller is configured by software",
+      "body": "On other SoCs a boot ROM or a vendor firmware blob trains the memory. Here the SPL replays register values generated for this board's DDR3L chips; get them wrong and the board never reaches U-Boot.",
+      "up": 1
+    },
+    {
+      "anchor": "UART0",
+      "title": "Peripherals live on MIO pins",
+      "body": "UART0, the SD host, Ethernet, USB, QSPI and I2C are hard blocks routed to 54 multiplexed pins. They work without a bitstream. This is why the first boot is PS-only.",
+      "up": 1
+    },
+    {
+      "anchor": "PL  ·  PROGRAMMABLE LOGIC  (an FPGA, empty at power-on)",
+      "title": "The fabric is a blank slate",
+      "body": "Artix-7 class logic: 53,200 LUTs, 106,400 flip-flops, 140 block RAMs and 220 DSP slices on the XC7Z020. It does nothing until a configuration (a bitstream) is loaded, and it forgets it at every power cycle.",
+      "up": 1
+    },
+    {
+      "anchor": "Zmod port A",
+      "title": "The Zmod connectors belong to the fabric",
+      "body": "The SYZYGY ports have their own I/O banks wired to the PL, not to the processors. A Zmod ADC is therefore invisible to Linux until a PL design and a driver exist (chapter 13).",
+      "up": 1
+    },
+    {
+      "anchor": "AXI interconnect between PS and PL",
+      "title": "The bus pair that joins them",
+      "body": "General-purpose ports let the CPUs read and write registers in the fabric; high-performance ports let fabric masters, such as a DMA engine, write straight into DDR; interrupts and clocks go the same way. A design's address map comes from Vivado.",
+      "up": 1
+    },
+    {
+      "anchor": "HOW THIS DIFFERS FROM THE OTHER BOARDS OF THIS REPOSITORY",
+      "title": "What changes for you",
+      "body": "No secure monitor and no 64-bit exception levels to study, but a first stage that depends on this board's hardware design, and a second half of the chip that you program. Everything that follows in chapters 01 to 12 is the PS; chapter 13 starts on the PL.",
+      "up": 1
+    }
+  ]
+}

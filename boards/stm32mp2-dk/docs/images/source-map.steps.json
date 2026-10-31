@@ -1,0 +1,23 @@
+{
+  "title": "The code that runs, in order",
+  "steps": [
+    {"anchor": null, "title": "A reading list in boot order",
+     "body": "Each coloured group is one boot stage, from BL2 at the top to Linux at the bottom, and each row is a source file with one line on what to look for. Paths are inside `build/src/` after `./build.sh firmware` and `./build.sh kernel`.\n\nUse it when you want to understand or change a step: it tells you which file to open."},
+    {"anchor": "BL2", "up": 1, "title": "BL2: find the FIP, start DDR, place each image",
+     "body": "In `trusted-firmware-a`, `bl2_io_storage.c` finds the FIP by partition type GUID first, then by the name \"fip\". `bl2_platform_setup()` calls `stm32mp2_ddr_probe()` and then `stm32mp2_risaf_init()`.\n\nThe load plan comes from `plat_bl2_mem_params_desc.c` and the fw-config file, which puts OP-TEE at `0x82000000`, 32 MiB."},
+    {"anchor": "BL31", "up": 1, "title": "BL31: start up, then dispatch calls to OP-TEE",
+     "body": "`bl31_main.c` is the generic start-up of the resident monitor and ends by running the next image. `bl31_plat_setup.c` sets up the UART console and `stm32mp_gic_init()`.\n\n`opteed_main.c` is the OP-TEE dispatcher, and `stm32mp_svc_setup.c` is the STM32 SiP service, reachable through `smc`."},
+    {"anchor": "OP-TEE", "up": 1, "title": "OP-TEE: configuration, console and the SCMI server",
+     "body": "`conf.mk` sets `CFG_TZDRAM_START=0x82000000`, the SCMI server product `stm32mp2` and 64-bit trusted applications only. `scmi_server.c` runs the SCMI server inside the OP-TEE core, `core/pta/scmi.c` is the entry point for SCMI messages, and `config_scmi.c` ties SCMI requests to OP-TEE's clock and reset drivers.\n\nThis group is where the clocks Linux asks for are actually switched."},
+    {"anchor": "U-Boot", "up": 1, "title": "U-Boot: from ROM context to booti",
+     "body": "`cpu.c` sets `boot_device` and `boot_instance` from the ROM's boot context. `stm32mp25_st_common.h` defines `bootcmd_stm32mp`, `config_distro_bootcmd.h` holds `scan_dev_for_boot_part`, `sysboot.c` parses `extlinux.conf`, and `booti.c` hands the DTB to the kernel in `x0` and jumps.\n\nU-Boot is also an SCMI client of OP-TEE (`optee_agent.c`)."},
+    {"anchor": "Linux", "up": 1, "title": "Linux: device tree, SCMI clocks, drivers, init",
+     "body": "`stm32mp251.dtsi` describes the `optee` and `scmi` firmware nodes. `clk-scmi.c` turns `clk_enable()` on an SCMI clock into a message, `mmci.c` is the SD card controller and `stm32-usart.c` the `ttySTM0` console.\n\n`init/main.c` ends with `kernel_init()` running `/sbin/init`, the first user program."},
+    {"anchor": ["plat/st/stm32mp2/plat_bl2_mem_params_desc.c", "fdts/stm32mp257f-dk-ca35tdcid-fw-config.dtsi"], "title": "Where load addresses and BL33 mode are decided",
+     "body": "`plat_bl2_mem_params_desc.c` says which image goes where, and BL33_MODE is `MODE_EL1` when `STM32MP_BL33_EL1=1`. The fw-config `.dtsi` holds OP-TEE's `load-address` and `reg`.\n\nChange these and the memory map changes with them."},
+    {"anchor": ["core/pta/scmi.c", "drivers/firmware/arm_scmi/transports/optee.c"], "title": "The SCMI path crosses two source trees",
+     "body": "On the Linux side, `scmi_optee_send_message()` in `transports/optee.c` turns one SCMI message into one call into OP-TEE. On the secure side, `core/pta/scmi.c` is the pseudo trusted application that receives it.\n\nFollowing these two files shows how a clock request leaves Linux and arrives in OP-TEE."},
+    {"anchor": "Open any of them with:", "pad": 20, "title": "Takeaway: open the file and search the symbol",
+     "body": "Any file can be opened with `less build/src/<repo>/<path>`. The footer lists useful searches, such as `grep -rn \"scmi-optee\"` in the Linux SCMI directory, `grep -rn \"BL33_MODE\"` in TF-A's `plat/st/` and `grep -rn \"scan_dev_for_boot_part\"` in U-Boot's `include/`.\n\nThe order top to bottom is the boot order, so a hang at some stage points to that group of files."}
+  ]
+}

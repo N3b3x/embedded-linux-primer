@@ -1,0 +1,118 @@
+/* Colours match the diagrams (docs/images/_src/kit.py): one palette, one role per colour. */
+:root {
+  --role-secure: #e11d48;
+  --role-normal: #0d9488;
+  --role-boot: #2563eb;
+  --role-fw: #d97706;
+  --role-rootfs: #7c3aed;
+  --role-hw: #475569;
+  --md-primary-fg-color: #0f192d;
+  --md-primary-fg-color--light: #1b2a4a;
+  --md-primary-fg-color--dark: #0b1220;
+  --md-primary-bg-color: #e5edf7;
+  --md-primary-bg-color--light: #9fb0c6;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-default-bg-color: #0b1220;
+  --md-default-bg-color--light: #121c33;
+  --md-default-bg-color--lighter: #1b2a4a;
+  --md-default-bg-color--lightest: #26344f;
+  --md-default-fg-color: #e5edf7;
+  --md-default-fg-color--light: #cbd5e1;
+  --md-default-fg-color--lighter: #9fb0c6;
+  --md-code-bg-color: #0f192d;
+  --md-code-fg-color: #e5edf7;
+  --md-typeset-a-color: #5eead4;
+  --md-footer-bg-color: #080d18;
+  --md-footer-bg-color--dark: #060a13;
+}
+
+/* Wider reading column: the diagrams are 1400 px wide. */
+.md-grid { max-width: 90rem; }
+.md-typeset { font-size: 0.78rem; }
+.md-typeset h1 { font-weight: 700; letter-spacing: -0.01em; }
+.md-typeset h2 { font-weight: 700; margin-top: 2.2em; }
+
+/* Diagrams */
+.md-typeset img[src$=".svg"] {
+  border-radius: 14px;
+  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.35);
+  border: 1px solid #1e2a44;
+  background: #0b1220;
+}
+.md-typeset a > img[src$=".svg"] { cursor: zoom-in; }
+
+/* Tables */
+.md-typeset table:not([class]) {
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 0.72rem;
+}
+.md-typeset table:not([class]) th {
+  background: var(--md-default-bg-color--lighter);
+  color: var(--md-default-fg-color);
+}
+[data-md-color-scheme="default"] .md-typeset table:not([class]) th { background: #e8edf5; }
+
+/* Blockquotes read as call-outs */
+.md-typeset blockquote {
+  border-left: 4px solid var(--role-boot);
+  background: rgba(37, 99, 235, 0.07);
+  border-radius: 0 10px 10px 0;
+  padding: 0.4rem 1rem;
+  color: var(--md-default-fg-color);
+}
+
+/* Landing page */
+.hero {
+  text-align: center;
+  padding: 2.6rem 1rem 1.6rem;
+}
+.hero h1 { font-size: 2.6rem; margin: 0 0 0.4rem; }
+.hero p.tagline { font-size: 1.05rem; color: var(--md-default-fg-color--light); max-width: 46rem; margin: 0 auto 1.4rem; }
+.hero .md-button { margin: 0.25rem; }
+.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center; margin: 0.8rem 0 0; }
+.chip {
+  display: inline-block; padding: 0.12rem 0.65rem; border-radius: 999px; font-size: 0.68rem;
+  font-weight: 700; border: 1px solid; background: transparent; white-space: nowrap;
+}
+.chip.secure { color: #fda4af; border-color: var(--role-secure); }
+.chip.normal { color: #5eead4; border-color: var(--role-normal); }
+.chip.boot { color: #93c5fd; border-color: var(--role-boot); }
+.chip.fw { color: #fcd34d; border-color: var(--role-fw); }
+.chip.rootfs { color: #c4b5fd; border-color: var(--role-rootfs); }
+.chip.hw { color: #cbd5e1; border-color: var(--role-hw); }
+
+.md-typeset .grid.cards > ul > li, .md-typeset .grid > .card {
+  border-radius: 14px;
+  border: 1px solid var(--md-default-bg-color--lightest);
+  background: var(--md-default-bg-color--light);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.md-typeset .grid.cards > ul > li:hover { transform: translateY(-2px); border-color: var(--role-normal); }
+[data-md-color-scheme="default"] .md-typeset .grid.cards > ul > li { background: #fff; border-color: #dbe3ef; }
+
+/* Status table cells */
+.md-typeset td code { white-space: nowrap; }
+
+/* Buttons: teal on the dark header colour, readable in both schemes */
+.md-typeset .md-button {
+  color: #5eead4;
+  border-color: #14b8a6;
+  border-radius: 10px;
+  font-weight: 700;
+}
+.md-typeset .md-button:hover { background: #14b8a6; border-color: #14b8a6; color: #04201c; }
+.md-typeset .md-button--primary { background: #14b8a6; border-color: #14b8a6; color: #04201c; }
+.md-typeset .md-button--primary:hover { background: #5eead4; border-color: #5eead4; color: #04201c; }
+[data-md-color-scheme="default"] .md-typeset .md-button { color: #0f766e; border-color: #0f766e; }
+[data-md-color-scheme="default"] .md-typeset .md-button--primary { background: #0f766e; color: #fff; }
+
+/* Whole-card links: a card with one link is clickable anywhere (the link stretches over the card) */
+.md-typeset .grid.cards > ul > li { position: relative; cursor: pointer; }
+.md-typeset .grid.cards > ul > li > p:last-child > a:only-child::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; z-index: 1;
+}
+.md-typeset .grid.cards > ul > li:focus-within { border-color: var(--role-normal); box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.45); }
+.md-typeset .grid.cards > ul > li > p:last-child > a:only-child:focus-visible { outline: none; }

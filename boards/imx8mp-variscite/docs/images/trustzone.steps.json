@@ -1,0 +1,23 @@
+{
+  "title": "How TrustZone is enforced",
+  "steps": [
+    {"anchor": null, "title": "The bus decides, on every access",
+     "body": "TrustZone is not a Linux feature. Each memory or peripheral access carries a security attribute, and hardware checkers in front of memory and peripherals allow or block it. Firmware only programs the rules.\n\nThe top shows the mechanism, the bottom what it protects in this build and what changes with OP-TEE."},
+    {"anchor": "Cortex-A53 core", "up": 1, "title": "One bit says which world the CPU is in",
+     "body": "The core's security state is `SCR_EL3.NS`: 0 is secure, 1 is non-secure. Only EL3 (BL31) can write it, which is why only BL31 can switch worlds. Linux always runs with NS = 1."},
+    {"anchor": "every read/write carries AxPROT[1] = NS", "title": "The bit rides on every access",
+     "body": "Every read and write leaves the core with `AxPROT[1]` set to the NS value. The AXI interconnect (the chip's internal bus) routes the access, attribute attached, to the right checker.\n\nIf the attribute were not carried on the bus, the checkers would have nothing to compare."},
+    {"anchor": "TZASC (TZC-380)", "up": 1, "title": "The TZASC guards DDR",
+     "body": "The TrustZone Address Space Controller sits in front of DDR with up to 16 regions, each with secure and non-secure read/write permissions. A denied access gives a bus error and the CPU aborts."},
+    {"anchor": "CSU + RDC", "up": 1, "title": "CSU and RDC guard the peripherals",
+     "body": "The CSU sets secure or non-secure access per peripheral (CAAM, SNVS, UART and so on). The RDC decides which bus master (A53, M7 core, DMA) may touch which peripheral."},
+    {"anchor": "WHO PROGRAMS THE RULES IN THIS BUILD", "up": 1, "title": "Firmware writes the rules, then opens everything",
+     "body": "SPL's `enable_tzc380()` turns the TZASC on, locks it and sets region 0 to cover all DDR for both worlds. BL31 programs the same open region again, and writes `CSU = 0x00ff00ff` x64 so every peripheral is reachable from both worlds.\n\nThe checkers are on but configured to let everything through."},
+    {"anchor": "This build (BL31 only)", "up": 1, "title": "This build: nothing in DDR is secure-only",
+     "body": "One region covers `0x4000_0000` to `0x1_3FFF_FFFF` with read/write for both worlds, so Linux can reach any address. The secure world is just BL31, living in on-chip RAM, outside DDR."},
+    {"anchor": "With OP-TEE (optional)", "up": 1, "title": "With OP-TEE a secure-only region appears",
+     "body": "A second region at `0x5600_0000` allows only secure access. A non-secure access from Linux to it is blocked by the TZASC, so even root or a compromised kernel cannot read OP-TEE's memory.\n\nThe rest of DDR stays open to both worlds as before."},
+    {"anchor": "TrustZone is a mechanism, not a guarantee: it protects exactly what firmware marks secure. Adding OP-TEE (plus HAB secure boot, so nobody can swap", "up": 1, "title": "TrustZone protects only what firmware marks secure",
+     "body": "Enabling it is not enough: OP-TEE plus HAB secure boot (so nobody can swap the firmware) is what turns this into protected key storage.\n\nThe companion diagram **What happens on an smc** completes the picture by showing how a call enters the secure world through BL31 in the first place."}
+  ]
+}

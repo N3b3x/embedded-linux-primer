@@ -1,0 +1,54 @@
+{
+  "title": "Inside fip.bin",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "A table of contents and six images",
+      "body": "A FIP is a table of contents (one UUID, offset and size per image) followed by the images. BL2 asks for each image by UUID, so the order does not matter. The bar is drawn to scale; the table below gives the exact numbers from a real build."
+    },
+    {
+      "anchor": "OP-TEE hdr",
+      "title": "OP-TEE header: how to start OP-TEE",
+      "body": "A 44-byte header (`--tos-fw`, passed as `BL32=`). BL2 reads it to learn OP-TEE's entry point and the sizes of the other two OP-TEE files.",
+      "up": 1
+    },
+    {
+      "anchor": "OP-TEE pager",
+      "title": "OP-TEE pager: the part that stays in on-chip RAM",
+      "body": "`tee-pager_v2.bin`, 74,648 bytes (`--tos-fw-extra1`). It holds the resident core, including the SCMI server, and runs from the on-chip SRAM.",
+      "up": 1
+    },
+    {
+      "anchor": "OP-TEE paged",
+      "title": "OP-TEE pageable: the rest, loaded on demand",
+      "body": "`tee-pageable_v2.bin`, 364,544 bytes (`--tos-fw-extra2`). OP-TEE's pager copies pages of it into the on-chip RAM as they are needed. The pager is on by default for this chip, which is why OP-TEE is three images here and two on the 64-bit board.",
+      "nth": 1,
+      "up": 1
+    },
+    {
+      "anchor": "U-Boot",
+      "title": "U-Boot: the biggest part",
+      "body": "`u-boot-nodtb.bin` (`--nt-fw`, `BL33=`), 1,098,696 bytes, loaded by BL2 to `0xC0100000` in normal-world DDR. \"Non-trusted firmware\" is TF-A's name for the normal-world bootloader.",
+      "nth": 1,
+      "up": 1
+    },
+    {
+      "anchor": "fw-config",
+      "title": "fw-config: BL2's load plan",
+      "body": "A tiny device tree (`--fw-config`) built from `fdts/` that says where each image goes and how the TZC-400 memory firewall is divided: the top 32 MiB of DDR secure for OP-TEE, the rest non-secure.",
+      "up": 1
+    },
+    {
+      "anchor": "U-Boot DTB",
+      "title": "U-Boot's own device tree",
+      "body": "`u-boot.dtb` (`--hw-config`, `BL33_CFG=`), loaded to `0xC0500000`. It is the tree U-Boot itself uses: it names the console, the SD controller and the environment partition.",
+      "up": 1
+    },
+    {
+      "anchor": "Three facts worth remembering",
+      "title": "What is not in here",
+      "body": "No BL31 and no DDR firmware, because this 32-bit chip needs neither; and BL2 itself is not in the FIP, because the Boot ROM already loaded it from `fsbl1`. The whole FIP is about 1.6 MB in a 4 MiB partition.",
+      "up": 1
+    }
+  ]
+}

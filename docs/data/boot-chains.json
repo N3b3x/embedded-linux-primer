@@ -1,0 +1,320 @@
+{
+ "columns": [
+  {
+   "id": "rom",
+   "name": "Boot ROM",
+   "hint": "Fixed code inside the chip. Runs first, cannot be changed."
+  },
+  {
+   "id": "first",
+   "name": "First loader",
+   "hint": "Runs from on-chip RAM, because DRAM is not trained yet. Trains it, loads the rest."
+  },
+  {
+   "id": "secure",
+   "name": "Secure world",
+   "hint": "The secure monitor (TF-A) and optionally a trusted OS (OP-TEE). Resident after boot."
+  },
+  {
+   "id": "boot",
+   "name": "Bootloader",
+   "hint": "U-Boot or UEFI. Finds the kernel and device tree and starts Linux."
+  },
+  {
+   "id": "kernel",
+   "name": "Kernel",
+   "hint": "Linux, then the root filesystem and your application."
+  }
+ ],
+ "boards": [
+  {
+   "id": "imx8mp",
+   "name": "i.MX 8M Plus",
+   "vendor": "NXP · Variscite module",
+   "model": "SD-card image",
+   "chapter": "boards/imx8mp-variscite/docs/01-boot-flow/",
+   "stages": [
+    {
+     "col": "rom",
+     "name": "Boot ROM",
+     "kind": "hw",
+     "runs": "EL3 · secure, mask ROM",
+     "does": "Reads the boot-mode switch and loads imx-boot from 32 KiB of the SD card or eMMC.",
+     "stored": "silicon",
+     "built": "not built: part of the chip"
+    },
+    {
+     "col": "first",
+     "name": "U-Boot SPL",
+     "kind": "boot",
+     "runs": "EL3 · secure, on-chip RAM at 0x0092_0000",
+     "does": "Identifies the module, trains the LPDDR4, unpacks the FIT image and starts BL31.",
+     "stored": "imx-boot.bin at 32 KiB of the card",
+     "built": "./build.sh uboot uboot"
+    },
+    {
+     "col": "secure",
+     "name": "TF-A BL31",
+     "kind": "secure",
+     "runs": "EL3 · secure monitor, resident after boot (0x0097_0000)",
+     "does": "Sets up TrustZone and answers PSCI calls from Linux, such as starting CPUs 1 to 3.",
+     "stored": "inside imx-boot.bin",
+     "built": "./build.sh uboot atf"
+    },
+    {
+     "col": "secure",
+     "name": "OP-TEE (BL32)",
+     "kind": "secure",
+     "runs": "S-EL1 · trusted OS, DDR at 0x5600_0000",
+     "does": "A trusted OS for keys and secure services. Optional, and not part of this build.",
+     "stored": "would sit inside imx-boot.bin",
+     "built": "not built here",
+     "optional": true
+    },
+    {
+     "col": "boot",
+     "name": "U-Boot (BL33)",
+     "kind": "boot",
+     "runs": "EL2 · non-secure, DDR at 0x4020_0000",
+     "does": "Picks the device tree, loads /boot/Image.gz from the root partition and runs booti.",
+     "stored": "inside imx-boot.bin; reads /boot from the card",
+     "built": "./build.sh uboot uboot"
+    },
+    {
+     "col": "kernel",
+     "name": "Linux 6.18",
+     "kind": "normal",
+     "runs": "EL2 to EL1 · non-secure",
+     "does": "Starts CPUs 1 to 3 through BL31, mounts the SD card and runs /sbin/init.",
+     "stored": "/boot on the card's root partition",
+     "built": "./build.sh kernel"
+    }
+   ]
+  },
+  {
+   "id": "stm32mp1",
+   "name": "STM32MP1",
+   "vendor": "STMicroelectronics · STM32MP157F-DK2",
+   "model": "SD-card image",
+   "chapter": "boards/stm32mp1-dk2/",
+   "stages": [
+    {
+     "col": "rom",
+     "name": "Boot ROM",
+     "kind": "hw",
+     "runs": "secure, mask ROM",
+     "does": "Reads the boot-mode pins, finds the GPT partition named fsbl1 and loads TF-A BL2 from it into on-chip SRAM.",
+     "stored": "silicon",
+     "built": "not built: part of the chip"
+    },
+    {
+     "col": "first",
+     "name": "TF-A BL2",
+     "kind": "secure",
+     "runs": "secure · runs from on-chip SRAM",
+     "does": "Sets up the clocks, the PMIC and the DDR3 memory, programs the memory firewall and loads the FIP.",
+     "stored": "partition fsbl1",
+     "built": "./build.sh firmware tfa"
+    },
+    {
+     "col": "secure",
+     "name": "OP-TEE",
+     "kind": "secure",
+     "runs": "secure SVC + monitor",
+     "does": "The secure monitor (smc, PSCI), the trusted OS and the SCMI server for clocks, resets and regulators, all in one image.",
+     "stored": "inside the FIP (partition fip)",
+     "built": "./build.sh firmware optee, packed by firmware fip"
+    },
+    {
+     "col": "boot",
+     "name": "U-Boot",
+     "kind": "boot",
+     "runs": "non-secure SVC",
+     "does": "Finds /boot/extlinux/extlinux.conf on the bootable partition and loads the kernel and device tree.",
+     "stored": "inside the FIP; reads /boot from the card",
+     "built": "./build.sh firmware uboot, packed by firmware fip"
+    },
+    {
+     "col": "kernel",
+     "name": "Linux 6.18",
+     "kind": "normal",
+     "runs": "non-secure SVC / user mode",
+     "does": "Mounts the root partition by PARTUUID and runs /sbin/init. A 32-bit ARM kernel (zImage).",
+     "stored": "/boot on the card's root partition",
+     "built": "./build.sh kernel"
+    }
+   ]
+  },
+  {
+   "id": "stm32mp2",
+   "name": "STM32MP2",
+   "vendor": "STMicroelectronics · STM32MP257F-DK",
+   "model": "SD-card image",
+   "chapter": "boards/stm32mp2-dk/",
+   "stages": [
+    {
+     "col": "rom",
+     "name": "Boot ROM",
+     "kind": "hw",
+     "runs": "secure, mask ROM",
+     "does": "Reads the boot-mode pins, finds the GPT partition named fsbla1 and loads TF-A BL2 from it into on-chip SRAM.",
+     "stored": "silicon",
+     "built": "not built: part of the chip"
+    },
+    {
+     "col": "first",
+     "name": "TF-A BL2",
+     "kind": "secure",
+     "runs": "secure · runs from on-chip SRAM",
+     "does": "Trains the LPDDR4, then loads BL31, OP-TEE, U-Boot and their device trees from the FIP partition.",
+     "stored": "partition fsbla1",
+     "built": "./build.sh firmware tfa"
+    },
+    {
+     "col": "secure",
+     "name": "TF-A BL31",
+     "kind": "secure",
+     "runs": "EL3 · secure monitor, resident after boot",
+     "does": "Answers PSCI calls from Linux and switches between the secure and normal worlds.",
+     "stored": "inside the FIP (partition fip)",
+     "built": "./build.sh firmware tfa, packed by firmware fip"
+    },
+    {
+     "col": "secure",
+     "name": "OP-TEE (BL32)",
+     "kind": "secure",
+     "runs": "S-EL1 · trusted OS",
+     "does": "Serves SCMI requests: Linux asks it, not the registers, to set clocks, resets and voltages.",
+     "stored": "inside the FIP (partition fip)",
+     "built": "./build.sh firmware optee, packed by firmware fip"
+    },
+    {
+     "col": "boot",
+     "name": "U-Boot (BL33)",
+     "kind": "boot",
+     "runs": "non-secure EL1",
+     "does": "Reads /boot/extlinux/extlinux.conf from the root partition and starts the kernel.",
+     "stored": "inside the FIP; reads /boot from the card",
+     "built": "./build.sh firmware uboot, packed by firmware fip"
+    },
+    {
+     "col": "kernel",
+     "name": "Linux 6.18",
+     "kind": "normal",
+     "runs": "non-secure EL1",
+     "does": "Mounts the root partition by PARTUUID and runs /sbin/init. Talks to OP-TEE over SCMI.",
+     "stored": "/boot on the card's root partition",
+     "built": "./build.sh kernel"
+    }
+   ]
+  },
+  {
+   "id": "zynq",
+   "name": "Zynq-7000",
+   "vendor": "AMD · Digilent Eclypse Z7",
+   "model": "SD-card image",
+   "chapter": "boards/zynq7000-eclypse-z7/",
+   "stages": [
+    {
+     "col": "rom",
+     "name": "BootROM",
+     "kind": "hw",
+     "runs": "secure state, mask ROM",
+     "does": "Reads the boot-mode jumper, finds BOOT.BIN in the first FAT partition of the card and copies it to on-chip RAM.",
+     "stored": "silicon",
+     "built": "not built: part of the chip"
+    },
+    {
+     "col": "first",
+     "name": "U-Boot SPL (BOOT.BIN)",
+     "kind": "boot",
+     "runs": "runs from on-chip RAM",
+     "does": "Runs ps7_init (pins, PLLs, clocks and the DDR3L memory), starts the UART and the SD controller and loads u-boot.img.",
+     "stored": "BOOT.BIN in the FAT partition",
+     "built": "./build.sh uboot"
+    },
+    {
+     "col": "boot",
+     "name": "U-Boot (u-boot.img)",
+     "kind": "boot",
+     "runs": "runs from DDR",
+     "does": "Reads /extlinux/extlinux.conf, loads zImage and the device tree and runs bootz.",
+     "stored": "u-boot.img in the FAT partition",
+     "built": "./build.sh uboot"
+    },
+    {
+     "col": "kernel",
+     "name": "Linux 6.18",
+     "kind": "normal",
+     "runs": "SVC mode / user mode",
+     "does": "Mounts the ext4 root partition by PARTUUID and runs /sbin/init. There is no secure monitor: the Cortex-A9s stay in the secure state.",
+     "stored": "zImage and the DTB in the FAT partition; rootfs on partition 2",
+     "built": "./build.sh kernel"
+    }
+   ]
+  },
+  {
+   "id": "jetson",
+   "name": "Jetson Orin Nano",
+   "vendor": "NVIDIA · Orin Nano Developer Kit",
+   "model": "Vendor flash tool over USB",
+   "chapter": "boards/jetson-orin-nano/docs/01-boot-flow/",
+   "stages": [
+    {
+     "col": "rom",
+     "name": "BootROM + PSC ROM",
+     "kind": "hw",
+     "runs": "BPMP (BootROM) and PSC (security controller)",
+     "does": "Initializes the boot media, loads BR-BCT, PSC-BL1, MB1 and MB1-BCT, and authenticates them.",
+     "stored": "silicon",
+     "built": "not built: part of the chip"
+    },
+    {
+     "col": "first",
+     "name": "MB1",
+     "kind": "boot",
+     "runs": "BPMP, the boot and power management processor",
+     "does": "Sets up pinmux, firewalls and SDRAM from the Memory BCT, loads the firmware that starts the CPU complex, then loads MB2.",
+     "stored": "QSPI-NOR on the module (A_mb1)",
+     "built": "NVIDIA binary, flashed by ./build.sh flash"
+    },
+    {
+     "col": "first",
+     "name": "MB2",
+     "kind": "boot",
+     "runs": "CCPLEX, the CPU complex",
+     "does": "The next-stage bootloader; also the stage that receives binaries from the host during flashing.",
+     "stored": "QSPI-NOR on the module (A_mb2)",
+     "built": "NVIDIA binary, flashed by ./build.sh flash"
+    },
+    {
+     "col": "secure",
+     "name": "TF-A + OP-TEE",
+     "kind": "secure",
+     "runs": "secure world on the CPU complex",
+     "does": "The secure monitor and trusted OS, packaged as one image (tos-optee_t234.img) that sits beside UEFI in the secure-os partition.",
+     "stored": "QSPI-NOR (A_secure-os)",
+     "built": "NVIDIA binary, flashed by ./build.sh flash"
+    },
+    {
+     "col": "boot",
+     "name": "UEFI + L4TLauncher",
+     "kind": "boot",
+     "runs": "CCPLEX · non-secure",
+     "does": "UEFI applies device-tree overlays and picks the boot device; L4TLauncher then reads extlinux.conf and loads the kernel, initrd and device tree.",
+     "stored": "UEFI in QSPI-NOR; L4TLauncher on the EFI system partition",
+     "built": "NVIDIA binary; extlinux.conf from ./build.sh"
+    },
+    {
+     "col": "kernel",
+     "name": "Linux 5.15 (tegra)",
+     "kind": "normal",
+     "runs": "CCPLEX · non-secure",
+     "does": "Mounts the root filesystem from SD or NVMe and starts systemd, with NVIDIA's userland on top.",
+     "stored": "/boot on the root device",
+     "built": "./build.sh kernel"
+    }
+   ]
+  }
+ ]
+}

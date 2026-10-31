@@ -1,0 +1,12 @@
+--- a/hardware/nvidia/t23x/nv-public/nv-platform/tegra234-p3768-0000+p3767-xxxx-nv-common.dtsi
++++ b/hardware/nvidia/t23x/nv-public/nv-platform/tegra234-p3768-0000+p3767-xxxx-nv-common.dtsi
+@@ -14,6 +14,9 @@
+ #include <dt-bindings/gpio/tegra234-gpio.h>
+ 
+ / {
++	/* embedded-linux-primer example: shows up as /proc/device-tree/primer,build */
++	primer,build = "custom-dts-example";
++
+ 	aliases {
+ 		serial1 = &uarta;
+ 		serial2 = &uarte;

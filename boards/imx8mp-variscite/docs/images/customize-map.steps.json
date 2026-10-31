@@ -1,0 +1,21 @@
+{
+  "title": "Where your changes go",
+  "steps": [
+    {"anchor": null, "title": "Edit here, the build picks it up",
+     "body": "Never edit `build/src/` directly, because it is disposable and gets recreated. Put your changes in the places in the left column; the middle column shows which script consumes them and the right column where they end up.\n\nThe tour follows the rows from top to bottom."},
+    {"anchor": "config/local.conf", "up": 1, "title": "local.conf configures every script",
+     "body": "Versions, passwords, packages, hostname and `BUILD_DIR` live here. Every script reads it, so it affects everything.\n\nIt is the first file to edit for anything that is a setting rather than code."},
+    {"anchor": ["patches/uboot/*.patch", "patches/atf/*.patch"], "up": 1, "title": "Boot firmware patches go into imx-boot.bin",
+     "body": "U-Boot patches are applied by `uboot.sh` step 3 and TF-A patches by step 2. Both end up in `imx-boot.bin` at 32 KiB, with the TF-A one in the BL31 part.\n\nCreate them with `git format-patch`."},
+    {"anchor": ["patches/kernel/*.patch", "config/kernel/*.cfg"], "up": 1, "title": "Kernel code and options end up in /boot",
+     "body": "Source patches and config fragments (`CONFIG_FOO=y`) are applied by `kernel.sh`. Either way the result is `/boot/Image.gz` and the modules.\n\nA fragment is the smaller change, so use one when an option is enough."},
+    {"anchor": "custom/dts/*.dts", "up": 1, "title": "Your carrier's device tree becomes a .dtb in /boot",
+     "body": "`kernel.sh dtbs` compiles your device tree and writes `/boot/<name>.dtb`.\n\nU-Boot then needs `fdt_file` to name it."},
+    {"anchor": "scripts/rootfs/debian-customize.sh", "up": 1, "title": "Users, network and services shape the Debian root",
+     "body": "`rootfs.sh` runs this script, and the result is `/` on partition 1.\n\nChanges here do not touch the kernel or the bootloader."},
+    {"anchor": "/boot/uEnv.txt (on the card)", "up": 1, "title": "uEnv.txt needs no rebuild",
+     "body": "It lives on the card and overrides boot-time variables such as `fdt_file` and `kernelargs`. U-Boot reads it at every boot.\n\nIt is the quickest way to test a change."},
+    {"anchor": "Then rebuild only what changed: ./build.sh uboot | kernel | rootfs, then ./build.sh image, or update a card in place with flash --kernel-only / --bootloader-only.", "title": "Takeaway: rebuild only what changed",
+     "body": "Run `./build.sh uboot`, `kernel` or `rootfs` as needed, then `./build.sh image`. Or update a card in place with `flash --kernel-only` or `--bootloader-only`."}
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "title": "Inside imx-boot.bin",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "One file, unpacked by three loaders",
+      "body": "`imx-boot.bin` is a single 1.68 MiB file written at 32 KiB on the card. The left column is the file laid out by offset; the right column shows the physical memory it is copied into.\n\nThe numbered arrows show who copies each part: the Boot ROM, then the SPL twice."
+    },
+    {
+      "anchor": "IVT + boot data",
+      "title": "The file starts with a header the ROM reads",
+      "body": "At offset `0x00000` the IVT (Image Vector Table) and boot data tell the Boot ROM where the SPL is and how long it is. You can see it with `xxd -l 4`, which prints `d100 2041`.\n\nIf this header is missing or misplaced, the ROM finds no boot image and the board stays silent.",
+      "up": 1
+    },
+    {
+      "anchor": "U-Boot SPL",
+      "title": "The SPL and its DDR firmware travel together",
+      "body": "The SPL (`u-boot-spl.bin`, 107 KiB) is followed by the LPDDR4 training firmware, 72 KiB of NXP binary blobs. The Boot ROM copies both into on-chip RAM at `0x0092_0000` in step 1.\n\nThe SPL detects the module, then trains DDR and loads the FIT image.",
+      "up": 1
+    },
+    {
+      "anchor": "CSF slot: HAB signature (empty, no secure boot)",
+      "title": "A reserved slot for secure boot",
+      "body": "The CSF slot would hold the HAB (High Assurance Boot) signature that lets the ROM check the image. It is empty here, so a chip that has not been locked down will run an unsigned image.\n\nFilling it is what turns on secure boot."
+    },
+    {
+      "anchor": "FIT header (u-boot.itb)",
+      "title": "The FIT image bundles everything else",
+      "body": "From file offset `0x58000` the FIT (Flattened Image Tree) has a table of contents followed by U-Boot, three device trees, BL31 and an absent OP-TEE slot. The SPL reads it and copies each entry to its own load address.",
+      "up": 1
+    },
+    {
+      "anchor": [
+        "uboot-1 · U-Boot proper",
+        "fdt-1 · imx8mp-var-dart-sonataboard.dtb · 72 KiB"
+      ],
+      "title": "U-Boot and one matching DTB go to DDR",
+      "body": "U-Boot proper (1.07 MiB) loads at `0x4020_0000`. Three device trees are packed in, for the DART, SOM and SMARC modules, but the SPL copies only the one matching the detected module (step 3).\n\nWrong module data means the wrong hardware description."
+    },
+    {
+      "anchor": "atf-1 · TF-A BL31",
+      "title": "BL31 goes to on-chip RAM, not DDR",
+      "body": "BL31 (43 KiB) is loaded to `0x0097_0000` in step 4, inside the on-chip RAM and kept there for the life of the system. The SPL then jumps to it at EL3.",
+      "up": 1
+    },
+    {
+      "anchor": "DDR · LPDDR4 · 4 GiB · 0x4000_0000 – 0x1_3FFF_FFFF",
+      "title": "Where DDR is used, and where OP-TEE would be",
+      "body": "U-Boot sits at `0x4020_0000`, entered at EL2, and later relocates itself to the top of RAM. A 32 MiB region at `0x5600_0000` is reserved for OP-TEE and locked by the TZASC (memory protection unit) only when it is built in.\n\nThe rest of RAM is left for the kernel.",
+      "up": 1
+    },
+    {
+      "anchor": "Then the SPL jumps to BL31 (EL3). BL31 sets up the secure monitor and the TZASC/CSU/RDC, enters OP-TEE if one was loaded, then ERETs into U-Boot at EL2 (non-secure).",
+      "title": "Takeaway: the SPL jumps to BL31, which starts U-Boot",
+      "body": "After loading, the SPL jumps to BL31, which sets up the secure monitor, optionally enters OP-TEE, and finally drops into U-Boot at EL2. That order is why BL31 has to be in the FIT even though U-Boot is the part you interact with."
+    }
+  ]
+}

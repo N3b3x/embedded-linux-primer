@@ -1,0 +1,58 @@
+{
+  "title": "Real files vs. live kernel views",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "Some of / is on disk, some is the kernel talking",
+      "body": "The root filesystem on the SD card holds programs and configuration. `/proc`, `/sys` and `/dev` are not on any disk: the kernel generates them as you read.\n\nThe values shown are real ones from this board."
+    },
+    {
+      "anchor": "On the SD card (ext4, mmcblk1p1)",
+      "up": 1,
+      "title": "The ext4 root holds what you build and ship",
+      "body": "Everything on this panel is an ordinary file on partition 1 of the SD card: `/bin`, `/usr`, `/etc`, `/root`, `/home` and `/var/log`.\n\nThe next steps pick out the directories that matter most to the boot process."
+    },
+    {
+      "anchor": "/boot",
+      "up": 1,
+      "title": "/boot is what U-Boot loads",
+      "body": "It holds `Image.gz` and the 47 DTBs. U-Boot reads the kernel and your board's device tree from here, so replacing a file here changes what boots.\n\nIt is also where `uEnv.txt` lives."
+    },
+    {
+      "anchor": "/lib/modules/6.18.20-custom",
+      "up": 1,
+      "title": "Modules and firmware are looked up at runtime",
+      "body": "The `.ko` drivers and `modules.alias` live under `/lib/modules/6.18.20-custom`. Firmware that drivers request, such as SDMA and audio, comes from `/lib/firmware/imx`.\n\nA kernel without a matching modules directory cannot load its drivers."
+    },
+    {
+      "anchor": "/sbin/init",
+      "up": 1,
+      "title": "/sbin/init is PID 1",
+      "body": "The kernel ends its boot by running this program, which is BusyBox or systemd. It reads `/etc` (`inittab`, `fstab`, hostname, network, ssh) and starts everything else.\n\nIf it is missing, the kernel panics at the end of boot."
+    },
+    {
+      "anchor": "/proc   procfs · processes + kernel state",
+      "up": 1,
+      "title": "/proc exposes processes and kernel state",
+      "body": "`cat /proc/cmdline` shows `console=ttymxc1,115200 root=/dev/mmcblk1p1 …`, `/proc/cpuinfo` shows 4 × Cortex-A53, and `/proc/meminfo` gives MemTotal and CmaTotal.\n\n`ps` and `free` just read these files."
+    },
+    {
+      "anchor": "/sys   sysfs · the device model",
+      "up": 1,
+      "title": "/sys exposes the device model",
+      "body": "Each device the kernel found has a directory here: the RTC at `/sys/bus/i2c/devices/3-0068`, temperature at `thermal_zone0/temp` (57000 means 57 °C), `eth1/carrier` (1 means cable in).\n\n`/sys/firmware/devicetree/base` is the DTB U-Boot passed."
+    },
+    {
+      "anchor": "/dev   devtmpfs + mdev/udev · device nodes",
+      "up": 1,
+      "title": "/dev holds device nodes created when drivers probe",
+      "body": "`/dev/mmcblk1p1` is the SD card's root partition, `/dev/ttymxc1` is the serial console, and `/dev/rtc0` and `/dev/i2c-3` appear once their drivers probe.\n\nThat is why a missing driver means a missing node."
+    },
+    {
+      "anchor": "mounts",
+      "title": "Takeaway: reading a file asks the kernel a question",
+      "body": "init mounts these three at boot. Reading a file there asks the kernel a question; writing one, such as `echo` to `/sys/class/leds/…`, changes hardware state.\n\nThat is how most commands in the board-use chapter work.",
+      "pad": 34
+    }
+  ]
+}

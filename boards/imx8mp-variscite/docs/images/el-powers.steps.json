@@ -1,0 +1,21 @@
+{
+  "title": "What each exception level can do that the one below cannot",
+  "steps": [
+    {"anchor": null, "title": "Four floors, and the CPU is always on exactly one",
+     "body": "Arm CPUs run code at one of four **exception levels** (EL0 to EL3). A higher number means more privilege. Higher floors configure and can override the ones below; lower floors can only ask.\n\nEach floor card lists where it lives on this board, its superpowers and its limits. Read from the top (EL3) down, then read the numbered walls and the rules for moving between floors."},
+    {"anchor": "TF-A BL31", "up": 1, "title": "EL3 is BL31: the floor that can flip worlds",
+     "body": "TF-A BL31 is the secure monitor, the firmware that stays resident from power-on to power-off. Only this floor can write `SCR_EL3.NS`, the bit that selects the secure or normal world, and it answers every `smc` (PSCI power calls, NXP SiP calls, OP-TEE).\n\nThe price is that nothing sits above it: a bug at EL3 owns the whole chip."},
+    {"anchor": "U-Boot during boot", "up": 2, "title": "EL2 controls what an OS is allowed to see",
+     "body": "The hypervisor level holds U-Boot during boot and Linux's small KVM stub (`nVHE` mode) afterwards. Its powers are **stage-2 page tables** (choosing which RAM an OS sees), trapping OS instructions through `HCR_EL2`, and virtual interrupts and timers for guests.\n\nIt cannot switch worlds or touch secure memory, and EL3 can trap it."},
+    {"anchor": "Linux kernel 6.18", "up": 2, "title": "EL1 is the kernel, which owns the hardware",
+     "body": "Linux programs its own and its applications' page tables (`TTBR0/1_EL1`), writes device registers (MMIO, memory-mapped I/O), masks interrupts and runs, pauses and kills processes.\n\nIt only sees the memory EL2 maps for it, a touch of secure RAM ends in a bus error, and EL2 or EL3 can trap it."},
+    {"anchor": "init, getty, sh", "up": 2, "title": "EL0 has no powers, by design",
+     "body": "Applications such as init, getty, the shell, BusyBox tools and your program run here. They have no system registers and no hardware access unless the kernel maps it, and must ask the kernel with `svc`.\n\nThis is exactly why an application crash is harmless to the rest of the system: it can only break its own memory."},
+    {"anchor": "What makes the walls", "up": 1, "title": "The walls are CPU hardware, not software",
+     "body": "The current level is CPU state (`PSTATE.EL`, readable with `mrs x0, CurrentEL`) that no instruction can raise. Registers are named per level (`_EL1`, `_EL2`, `_EL3`) and touching a higher one from below traps. Vector tables (`VBAR_ELx`) and stacks are fixed per level, each level has its own MMU view, and the level above sets the rules (`SCR_EL3`, `HCR_EL2`) that lower levels cannot undo.\n\nWithout these, a kernel bug could rewrite the firmware's rules."},
+    {"anchor": "Plus the second axis: worlds", "up": 1, "title": "Worlds are a second axis on top of the floors",
+     "body": "Independent of the level, `SCR_EL3.NS` travels with every bus access as `AxPROT[1]`, and hardware blocks (TZASC for DDR, CSU for peripherals) enforce it. That is how TrustZone works, and it is covered in chapter 13, section 5."},
+    {"anchor": "MOVING BETWEEN FLOORS", "up": 1, "title": "Up is an exception, down is only eret",
+     "body": "A CPU goes up through `svc` (app to kernel), `hvc` (to EL2), `smc` (to EL3) or an interrupt or fault. It saves where it was in `ELR_ELx` and `SPSR_ELx` and enters the higher floor at that floor's own vector, so the caller never chooses the entry address.\n\nDown is `eret` only: BL31 enters U-Boot at EL2 this way, and every syscall returns to EL0 this way."}
+  ]
+}

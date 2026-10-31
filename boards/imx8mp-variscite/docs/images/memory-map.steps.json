@@ -1,0 +1,61 @@
+{
+  "title": "Where things live in RAM",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "4 GiB of LPDDR4, drawn to scale, in two views",
+      "body": "The board's RAM starts at `0x4000_0000` and ends at `0x1_3FFF_FFFF`. The top bar shows the whole RAM while Linux runs; the bottom bar zooms into the first 64 MiB to show what happens during `booti`, U-Boot's kernel-launch command.\n\nValues come from this board's boot log and U-Boot environment."
+    },
+    {
+      "anchor": "kernel @ 0x4060_0000",
+      "up": 1,
+      "title": "The kernel sits near the start of RAM",
+      "body": "The kernel's 35 MiB of code and data lives at `0x4060_0000`, 2 MiB aligned, just above the base of RAM."
+    },
+    {
+      "anchor": "GPU",
+      "up": 1,
+      "title": "256 MiB are reserved for the GPU",
+      "body": "A fixed block at `0x6000_0000` belongs to the graphics hardware. Linux cannot hand it to ordinary processes, which is one reason the memory Linux reports is less than the full 4 GiB."
+    },
+    {
+      "anchor": "DSP · ~31 MiB",
+      "up": 1,
+      "title": "Another reservation holds the audio DSP firmware",
+      "body": "Near `0x9240_0000`, about 31 MiB are set aside for the HiFi4 audio DSP firmware and its heap. Without the reservation Linux could overwrite code the DSP is running."
+    },
+    {
+      "anchor": "SWIOTLB · 64 MiB @ 0xD000_0000",
+      "up": 1,
+      "title": "Bounce buffers serve 32-bit DMA devices",
+      "body": "Some devices can only do DMA (direct memory access, reading RAM without the CPU) below 4 GiB. When such a device needs memory that is higher, Linux copies data through this 64 MiB bounce buffer."
+    },
+    {
+      "anchor": "CMA · 704 MiB",
+      "up": 1,
+      "title": "A 704 MiB CMA pool serves big contiguous buffers",
+      "body": "The Contiguous Memory Allocator keeps one large block free for GPU, VPU (video) and camera buffers, which need physically contiguous memory. It runs up to the 4 GiB boundary and ordinary pages may use it until a device asks."
+    },
+    {
+      "anchor": [
+        "4 GiB boundary",
+        "ZONE_NORMAL (above 4 GiB)"
+      ],
+      "up": 1,
+      "title": "The 4 GiB line splits DMA and Normal zones",
+      "body": "Below `0x1_0000_0000` is ZONE_DMA, above it ZONE_NORMAL, ordinary RAM. This line is why 32-bit devices need the bounce buffers."
+    },
+    {
+      "anchor": "② U-Boot  load mmc 1:1 …",
+      "up": 1,
+      "title": "During booti, files land at fixed addresses",
+      "body": "SPL (1) and U-Boot at `0x4020_0000` come first, then U-Boot (2) reads `Image.gz` (14.9 MiB) to `img_addr = 0x4200_0000` and the device tree (78 KiB) to `fdt_addr = 0x4300_0000`. These addresses are U-Boot environment variables you can print."
+    },
+    {
+      "anchor": "③ unzip → booti",
+      "up": 1,
+      "title": "The kernel is unzipped, moved and run",
+      "body": "The compressed image is unzipped to `loadaddr = 0x4048_0000` and moved to `0x4060_0000` (2 MiB aligned). The 34.2 MiB Image then runs there, spanning `0x4060_0000` to `0x4290_0000`.\n\nNote the SPL and BL31 live in on-chip RAM (`0x0092_0000` and `0x0097_0000`), not in DDR; an OP-TEE build would also reserve `0x5600_0000` to `0x57FF_FFFF`."
+    }
+  ]
+}

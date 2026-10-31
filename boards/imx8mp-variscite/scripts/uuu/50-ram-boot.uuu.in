@@ -1,0 +1,22 @@
+
+# ---- Phase 2: load kernel, device tree and root filesystem into RAM and start Linux (nothing is written) ----
+
+# Linux (uncompressed Image) goes where U-Boot's own bootcmd would load it (${loadaddr}).
+FB: ucmd setenv fastboot_buffer ${loadaddr}
+FB: download -f @KERNEL@
+# The device tree goes to ${fdt_addr}, 0x43000000 in Variscite's environment.
+FB: ucmd setenv fastboot_buffer ${fdt_addr}
+FB: download -f @DTB@
+# The whole root filesystem goes to ${initrd_addr} (0x43800000) as an initramfs wrapped in a U-Boot
+# ramdisk header, so booti knows its size.
+FB: ucmd setenv fastboot_buffer ${initrd_addr}
+FB: download -f @INITRAMFS@
+
+# U-Boot started from USB resets its environment to the built-in defaults, so the kernel command line is
+# built here: the serial console of this module, and the init program of the initramfs.
+FB: ucmd setenv bootargs console=@CONSOLE@,115200 rdinit=/sbin/init rw
+# acmd = a command that never returns to fastboot (it starts Linux): booti <kernel> <ramdisk> <fdt>.
+FB: acmd booti ${loadaddr} ${initrd_addr} ${fdt_addr}
+
+# Ends the script. The board now runs Linux, so there is no fastboot device any more.
+FB: done

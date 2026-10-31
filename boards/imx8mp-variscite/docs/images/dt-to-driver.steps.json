@@ -1,0 +1,57 @@
+{
+  "title": "From a device-tree line to a working driver",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "Seven steps from text to /dev/rtc0",
+      "body": "The example is the DS1337 real-time clock on I2C4. Steps 1 to 3 happen on your PC during `./build.sh kernel`; steps 4 to 7 happen on the board at every boot.\n\nEvery Linux driver on the board is found and loaded in the same way."
+    },
+    {
+      "anchor": "1  Describe the hardware",
+      "up": 1,
+      "title": "1. A node says what exists and where",
+      "body": "In `imx8mp-var-som-symphony.dts` the `rtc@68` node under `&i2c4` has `compatible = \"dallas,ds1337\"` and `reg = <0x68>`: a DS1337 at I2C address 0x68 on bus I2C4.\n\nThe SoC cannot discover this chip by itself, so it has to be written down."
+    },
+    {
+      "anchor": "2  Compile it",
+      "up": 1,
+      "title": "2. dtc turns the text into a binary blob",
+      "body": "`dtc` compiles the text into a flat binary tree (an FDT, or \"blob\"). Includes and overlays are merged here: the SoC and SoM `.dtsi`, the carrier `.dts` and the 1.x revision overlay.\n\nThe output is `imx8mp-var-som-1.x-symphony.dtb`."
+    },
+    {
+      "anchor": "3  Ship it on the SD card",
+      "up": 1,
+      "title": "3. The image carries the DTB and the driver module",
+      "body": "`image.sh` places `/boot/Image.gz` and the `.dtb` on the card, along with `rtc-ds1307.ko` and `modules.alias` under `/lib/modules/6.18.20-custom/`.\n\nThe RTC driver is a module (`=m`), so it is **not** inside the kernel image."
+    },
+    {
+      "anchor": "4  U-Boot hands it over",
+      "up": 0,
+      "title": "4. U-Boot loads the DTB and passes it in x0",
+      "body": "U-Boot runs `load mmc 1:1 ${fdt_addr} /boot/${fdt_file}` with `fdt_addr = 0x4300_0000`, then `booti`. When the kernel starts, register `x0` holds the DTB address.\n\nU-Boot also patches in the RAM size and bootargs under `/chosen`."
+    },
+    {
+      "anchor": "5  Kernel builds devices",
+      "up": 0,
+      "title": "5. The kernel makes a device per node",
+      "body": "`of_platform` parses the DTB, and the built-in I2C4 driver creates a device for each child node, here `/sys/bus/i2c/devices/3-0068` (Linux bus 3 is I2C4, address 0x68).\n\nIt has a `modalias` of `of:NrtcT(null)Cdallas,ds1337` but no driver yet."
+    },
+    {
+      "anchor": "6  Find the matching driver",
+      "up": 0,
+      "title": "6. The modalias is looked up in modules.alias",
+      "body": "`depmod` builds `modules.alias`, which maps `of:N*T*Cdallas,ds1337` to `rtc_ds1307`. A built-in driver probes at once; a module must be loaded from userspace.\n\nAlpine uses `/sbin/coldplug` with `mdev -d`, Debian uses `systemd-udevd`. Without either, there is no RTC."
+    },
+    {
+      "anchor": "7  probe() runs",
+      "up": 0,
+      "title": "7. probe() registers /dev/rtc0",
+      "body": "The driver's `of_device_id` table contains `\"dallas,ds1337\"`. The strings match, `ds1307_probe()` talks to the chip and registers `/dev/rtc0` and `/sys/class/rtc/rtc0`.\n\n`hwclock -u` then works."
+    },
+    {
+      "anchor": "The key is the compatible string: the same text appears in the device tree and in the driver's of_match_table. Change the DT node, and Linux binds a different driver.",
+      "title": "Takeaway: the compatible string is the key",
+      "body": "The same text appears in the device tree and in the driver's `of_match_table`. Change the node, and Linux binds a different driver."
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "title": "Two software stacks for one board",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "One board, two ways to build its software",
+      "body": "The left column is `STACK=mainline`, the default: every project comes from its upstream repository. The right column is `STACK=st`: ST's own branches of the same four projects, plus ST's device trees. The middle column says what each difference means.\n\nThe point of having both is a **control**: the same board, the same card reader, the same serial cable, two independent software sets."
+    },
+    {
+      "anchor": [
+        "TF-A v2.15.0",
+        "TF-A v2.10-stm32mp-r3"
+      ],
+      "title": "Firmware: two TF-A trees",
+      "body": "TF-A is the first program ST's boot ROM can run from the card (BL2) and the secure monitor that stays resident (BL31). Upstream is v2.15.0; ST's is its own branch of v2.10.\n\nBoth are built for the same chip, but they are described by different board trees: TF-A's own copy upstream, ST's `dt-stm32mp` repository in the other. ST's build also turns on firmware-update support and prints more at boot."
+    },
+    {
+      "anchor": [
+        "OP-TEE 4.11.0",
+        "OP-TEE 4.0.0-stm32mp-r3"
+      ],
+      "title": "OP-TEE decides whether the SD card gets its power",
+      "body": "On this chip OP-TEE is also the SCMI server: Linux asks it, over a secure call, for clocks, resets and, here, the SD card's supply voltage.\n\nUpstream OP-TEE 4.11 serves clocks and resets only, so the mainline stack boots a device tree that replaces the supply with a fixed regulator. ST's OP-TEE 4.0 also serves voltage domains and runs the power-management chip, so ST's own device tree works unchanged."
+    },
+    {
+      "anchor": [
+        "U-Boot v2026.07",
+        "U-Boot v2023.10-stm32mp-r3"
+      ],
+      "title": "U-Boot: different versions, the same boot method",
+      "body": "Both U-Boots use the distro boot flow: find the bootable partition, read `/boot/extlinux/extlinux.conf`, load the kernel and the device tree it names.\n\nThat is why one image script serves both stacks. Only the device tree each U-Boot is built with differs."
+    },
+    {
+      "anchor": [
+        "Linux 6.18.58",
+        "Linux 6.6 (ST tree)"
+      ],
+      "title": "Linux: the kernel and its device tree",
+      "body": "Upstream 6.18 boots `stm32mp257f-dk-primer.dtb`, this repository's copy of the stock tree with two fixed regulators; the stock tree is the second menu entry. ST's 6.6 kernel boots the `ostl` tree, which names SCMI regulators that ST's OP-TEE provides.\n\nST's kernel also needs the GPU driver `etnaviv` kept out: loading it makes OP-TEE 4.0 panic, found on the bench."
+    },
+    {
+      "anchor": [
+        "Device trees: 4 copies",
+        "Device trees: 1 repository"
+      ],
+      "title": "Who describes the hardware",
+      "body": "A device tree tells each program which peripherals exist and who owns them. Upstream keeps a copy in each of the four projects, and nothing checks that the copies agree.\n\nST keeps all four in one repository, `dt-stm32mp`, so firmware and kernel are written against the same description. That is most of why the ST stack has been tested as a whole."
+    },
+    {
+      "anchor": [
+        "SD card: 5 partitions",
+        "SD card: 8 partitions"
+      ],
+      "title": "Two SD layouts",
+      "body": "The mainline layout has five partitions and BL2 finds the FIP by its type. ST's has eight: BL2 reads a small metadata record first, which names the active FIP partition (`fip-a` or `fip-b`).\n\nThe names and type GUIDs the boot ROM looks for are the same in both. The ST layout also starts BL2 at 17 KiB, exactly where ST's own image does."
+    },
+    {
+      "anchor": "How to use the two",
+      "up": 1,
+      "title": "Takeaway: the second stack is a control",
+      "body": "Boot `STACK=st` first, or whenever the mainline image is silent. If it reaches a login, the board, switches, card and cable are fine and the fault is in the mainline stack.\n\nIf both are silent the fault is shared, so check the boot switches, the serial port and the power supply before you change any software."
+    }
+  ]
+}

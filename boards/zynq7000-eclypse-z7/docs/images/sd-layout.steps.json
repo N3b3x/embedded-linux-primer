@@ -1,0 +1,61 @@
+{
+  "title": "What is on the SD card",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "An MBR disk with two partitions",
+      "body": "The BootROM understands exactly one thing: an MBR partition table with a FAT16/FAT32 partition holding a file named `BOOT.BIN`. GPT, which the other boards use, would not be read. So the card has a 300 MiB FAT partition for everything the boot chain reads and an ext4 partition for the root filesystem."
+    },
+    {
+      "anchor": "MBR  (sector 0)",
+      "title": "Sector 0 holds the table and a disk signature",
+      "body": "The MBR carries two partition entries and a 32-bit *disk signature*, `0x5a796e71` in this build. Linux builds `PARTUUID=5a796e71-02` from it, which is how the kernel command line names the root partition without caring whether the SD card is `mmcblk0` or `mmcblk1`.",
+      "up": 1
+    },
+    {
+      "anchor": "p1  FAT32 \"BOOT\"",
+      "title": "Partition 1 is FAT32, active, at 1 MiB",
+      "body": "Type `0c` (FAT32 LBA), starting at sector 2048 and 300 MiB long. The active flag is set: U-Boot's distro boot scans the bootable partition first.",
+      "up": 1
+    },
+    {
+      "anchor": "BOOT.BIN",
+      "title": "BOOT.BIN: read by the BootROM",
+      "body": "The ROM finds the first FAT partition, opens this file in the root directory and loads its payload (the SPL) into on-chip RAM. The name matters; FAT is case-insensitive so `BOOT.bin` also works.",
+      "up": 2
+    },
+    {
+      "anchor": "u-boot.img",
+      "title": "u-boot.img: read by the SPL",
+      "body": "The SPL has a small FAT reader and opens this file by name (`CONFIG_SPL_FS_LOAD_PAYLOAD_NAME`). It is U-Boot proper packed as a FIT image.",
+      "up": 2
+    },
+    {
+      "anchor": [
+        "extlinux/extlinux.conf",
+        "zImage, zynq-eclypse-z7.dtb"
+      ],
+      "title": "extlinux.conf, the kernel and its device tree: read by U-Boot",
+      "body": "U-Boot's distro boot tries each partition with the prefixes `/` and `/boot/`, and runs `sysboot` on `extlinux/extlinux.conf` where it finds one. \n\nPaths in `extlinux.conf` are relative to the FAT root, so the kernel can be replaced by copying two files, or with `./build.sh flash --kernel-only`.",
+      "up": 2
+    },
+    {
+      "anchor": "p2  rootfs  (ext4)",
+      "title": "Partition 2 is only for Linux",
+      "body": "ext4, label `rootfs`, from 301 MiB to the end. It holds the distribution, `/lib/modules/<version>` and the kernel's `.config`. On the running board the FAT partition is mounted at `/boot/firmware`.",
+      "up": 1
+    },
+    {
+      "anchor": "/extlinux/extlinux.conf (written by image.sh)",
+      "title": "Three lines carry the whole boot decision",
+      "body": "`LINUX` names the kernel, `FDT` the device tree, and `APPEND` the command line: `root=PARTUUID=5a796e71-02`, the serial console `ttyPS0,115200`, `rootwait` (the SD card appears late), `rw`, and `earlycon` for the first boot. Remove `earlycon` once the board boots.",
+      "up": 1
+    },
+    {
+      "anchor": "LATER, WITH A BITSTREAM FOR THE PL: THE LAYOUT STAYS",
+      "title": "Adding a bitstream later does not change the layout",
+      "body": "Either replace `BOOT.BIN` with one built by `bootgen` (vendor FSBL + `.bit` + U-Boot), or keep this one and put a converted bitstream next to `zImage` for U-Boot or Linux to load. Both are described in chapter 13; the partition table stays as it is.",
+      "up": 1
+    }
+  ]
+}

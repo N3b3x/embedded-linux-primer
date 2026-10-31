@@ -1,0 +1,61 @@
+{
+  "title": "From Starting kernel to login",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "The kernel ends at PID 1",
+      "body": "The top row is the kernel with timestamps from this board's `dmesg`. Below it the same boot jobs run twice, once with Alpine's BusyBox init and once with Debian's systemd.\n\nThe kernel's work ends when it starts PID 1 (the first user-space process)."
+    },
+    {
+      "anchor": "Booting Linux",
+      "title": "0.000 s: the kernel reads its inputs",
+      "body": "The kernel parses the DTB and the command line from U-Boot and reserves memory. Everything it learns about the hardware comes from the DTB.",
+      "up": 1
+    },
+    {
+      "anchor": "4 CPUs up",
+      "title": "0.006 s: four CPUs through BL31",
+      "body": "Linux starts the other cores with PSCI `CPU_ON`, an `smc` call answered by BL31. Without BL31 only one CPU would run.",
+      "up": 1
+    },
+    {
+      "anchor": "built-in drivers probe",
+      "title": "Drivers probe until 3.2 s",
+      "body": "Built-in drivers for UART, I2C, PMIC, eMMC, GPU, display and Ethernet initialise one after another. Most of the boot time is spent here.",
+      "up": 1
+    },
+    {
+      "anchor": "Waiting for root device",
+      "title": "3.26 s: wait for the SD card",
+      "body": "`rootwait` makes the kernel wait until `root=/dev/mmcblk1p1` appears, because the SD card may not be ready yet. Without it the kernel may try to mount the root before the card is ready and stop with a panic.",
+      "up": 1
+    },
+    {
+      "anchor": [
+        "EXT4 mounted r/w",
+        "Run /sbin/init"
+      ],
+      "title": "3.40 to 3.44 s: mount root and start init",
+      "body": "The ext4 partition p1 becomes `/` at 3.40 s, and at 3.44 s the kernel runs `/sbin/init`. From this moment user space is in charge.",
+      "up": 1
+    },
+    {
+      "anchor": "Alpine · BusyBox init",
+      "title": "Alpine: one small file, run top to bottom",
+      "body": "BusyBox init reads `/etc/inittab` line by line. About 15 lines mount the filesystems, start `syslogd`, run `mdev` and `coldplug` and `hwclock`, and finish with a getty.",
+      "up": 1
+    },
+    {
+      "anchor": "Debian · systemd",
+      "title": "Debian: units started in parallel",
+      "body": "systemd starts units by dependency, using `/etc/fstab`, `journald`, `udev`, `networkd`, `resolved` and ssh. The jobs are the same, but expressed as units instead of lines.",
+      "up": 1
+    },
+    {
+      "anchor": "login: prompt",
+      "title": "Both end at a serial login",
+      "body": "The serial getty uses the `console=` value from the kernel command line, so the prompt appears on the same UART as the boot log. A getty on the screen is also started.",
+      "up": 1
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "title": "./build.sh uuu emmc, step by step",
+  "steps": [
+    {
+      "anchor": null,
+      "title": "Five actors, eleven messages",
+      "body": "The PC runs `uuu`. It first talks to the Boot ROM, then to the SPL, then to U-Boot's fastboot gadget. U-Boot does every write to the eMMC. Time runs downward."
+    },
+    {
+      "anchor": "boot switch = SD, no card",
+      "up": 1,
+      "title": "Start: the board is in serial download",
+      "body": "With the switch on SD and no card, the ROM finds nothing to boot and falls back to USB serial download. The PC sees `1fc9:0146`, which the script checks with `lsusb` before it starts."
+    },
+    {
+      "anchor": "SDPS: boot -f imx-boot.bin",
+      "title": "1: one command streams the boot image",
+      "body": "`SDPS` is the stream protocol of this ROM. The ROM copies the SPL to on-chip RAM and starts it. No separate image is needed: it is the same `imx-boot.bin` that goes on an SD card."
+    },
+    {
+      "anchor": "SPL trains the LPDDR4",
+      "up": 1,
+      "title": "2: the SPL needs more",
+      "body": "The SPL trains the LPDDR4 memory, then asks the ROM through its API for the rest of the image. The ROM keeps reading from USB."
+    },
+    {
+      "anchor": "rest of imx-boot.bin: DDR firmware, BL31, U-Boot",
+      "title": "3: the rest arrives over USB",
+      "body": "The same stream carries the DDR firmware, TF-A BL31 and U-Boot proper. This is where a USB hub or dock can break the hand-over."
+    },
+    {
+      "anchor": "prints: Boot from USB for",
+      "up": 1,
+      "title": "4: U-Boot notices it was started from USB",
+      "body": "It prints a line about booting from USB, and instead of looking for a kernel it runs `fastboot 0`. The USB port becomes a new device, `1fc9:0152`, which `uuu` waits for."
+    },
+    {
+      "anchor": "FB: ucmd setenv fastboot_dev mmc ; mmc dev ${emmc_dev}",
+      "title": "5: aim at the module's eMMC",
+      "body": "`emmc_dev` is 2 in Variscite's environment. The SD slot is device 1, so it is never selected."
+    },
+    {
+      "anchor": "FB: flash -raw2sparse -bmap all sdcard.img",
+      "title": "6-7: the user area",
+      "body": "The SD-card image is written to the eMMC user area, sending only blocks that contain data. This gives the partition table, the root filesystem at 8 MiB and a copy of the boot image at 32 KiB."
+    },
+    {
+      "anchor": "mmc write → boot0 and boot1, offset 0",
+      "title": "8-9: the boot partitions",
+      "body": "`imx-boot.bin` is downloaded into RAM once and written to boot0 and boot1 at offset 0, where the ROM wants it when a boot partition is enabled."
+    },
+    {
+      "anchor": "mmc partconf 2 1 1 0",
+      "title": "10: tell the eMMC to boot from boot0",
+      "body": "This sets `PARTITION_CONFIG`: boot acknowledge on, boot partition 1 (boot0). Without it the ROM would ignore boot0. Then `FB: done` ends the script, and you flip the switch to eMMC."
+    }
+  ]
+}
